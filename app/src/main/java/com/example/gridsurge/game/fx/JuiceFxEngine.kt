@@ -267,11 +267,8 @@ class JuiceFxEngine(private val density: Float) {
         val progress = (glitchTimeRemaining / glitchDuration).coerceIn(0f, 1f)
         val currentAlpha = (progress * 255 * glitchIntensity).toInt()
 
-        // 1. Initial full-screen micro-flash
-        if (progress > 0.6f) {
-            flashPaint.alpha = ((progress - 0.6f) / 0.4f * 80 * glitchIntensity).toInt()
-            canvas.drawRect(0f, 0f, width, height, flashPaint)
-        }
+        // Full-screen flash removed for photosensitivity & seizure safety.
+        // Digital slices and chromatic tear bars remain active.
 
         // 2. Horizontal Digital Slices / Chromatic Tear Bars
         redSlicePaint.alpha = currentAlpha

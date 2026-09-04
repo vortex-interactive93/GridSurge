@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.gridsurge"
+        applicationId = "com.gridsurge.game"
         minSdk = 26
         targetSdk = 37
         versionCode = 1

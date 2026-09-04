@@ -429,12 +429,12 @@ fun MainMenuScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = ">>> INITIALIZE SURGE <<<",
+                        text = "▶ START MATCH",
                         color = Color(0xFF040812),
-                        fontSize = 16.sp,
+                        fontSize = 18.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Black,
-                        letterSpacing = 1.5.sp
+                        letterSpacing = 2.sp
                     )
                 }
             }
@@ -543,12 +543,16 @@ fun MainMenuScreen(
         }
 
         if (showDailyGlitchDialog) {
-            val dailyUiState = remember {
+            val todaySeedDate = DailyGlitchCountdownManager.getSeedHeaderDate()
+            val lastGlitchDate by profileManager.lastGlitchSeedDate.collectAsState()
+            val hasTicketToday = lastGlitchDate != todaySeedDate
+
+            val dailyUiState = remember(hasTicketToday, todaySeedDate) {
                 DailyGlitchUiState(
-                    seedDateFormatted = DailyGlitchCountdownManager.getSeedHeaderDate(),
-                    timeRemainingMillis = 66720000L,
-                    formattedTimeRemaining = "18h 32m",
-                    hasTicketAvailable = true,
+                    seedDateFormatted = todaySeedDate,
+                    timeRemainingMillis = DailyGlitchCountdownManager.getMillisUntilNextUtcMidnight(),
+                    formattedTimeRemaining = DailyGlitchCountdownManager.formatDurationHms(DailyGlitchCountdownManager.getMillisUntilNextUtcMidnight()),
+                    hasTicketAvailable = hasTicketToday,
                     userPersonalBestScore = 0L,
                     userPersonalBestWaves = 0,
                     userRank = null,
@@ -562,13 +566,13 @@ fun MainMenuScreen(
                 )
             }
 
+            val isNoAdsPurchased by profileManager.isNoAdsPurchased.collectAsState()
+
             DailyGlitchEntryDialog(
                 uiState = dailyUiState,
+                isNoAdsPurchased = isNoAdsPurchased,
                 onLaunchMission = {
-                    showDailyGlitchDialog = false
-                    onNavigate(Screen.DAILY_GLITCH)
-                },
-                onRetryWithStars = {
+                    profileManager.consumeGlitchTicket(todaySeedDate)
                     showDailyGlitchDialog = false
                     onNavigate(Screen.DAILY_GLITCH)
                 },

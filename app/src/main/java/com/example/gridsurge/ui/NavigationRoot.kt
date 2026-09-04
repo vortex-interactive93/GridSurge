@@ -29,10 +29,8 @@ import com.example.gridsurge.ui.career.CareerProgressScreen
 import com.example.gridsurge.ui.dialogs.CyberProfileSetupDialog
 import com.example.gridsurge.ui.quests.DailyMissionsScreen
 import com.example.gridsurge.ui.quests.DailyMissionsViewModel
-import com.example.gridsurge.ui.screens.AchievementTier
 import com.example.gridsurge.ui.screens.TierAchievementsScreen
 import com.example.gridsurge.ui.screens.StudioSplashScreen
-import com.example.gridsurge.ui.screens.TierAchievement
 import com.example.gridsurge.ui.store.CyberStoreScreen
 import kotlinx.coroutines.launch
 
@@ -278,43 +276,8 @@ fun NavigationRoot() {
                 }
             }
             Screen.ACHIEVEMENTS -> {
-                val claimedIds by profileManager.claimedAchievementIds.collectAsState()
-                val highScore by profileManager.highScore.collectAsState()
-                val maxCombo by profileManager.maxCombo.collectAsState()
-                val totalLines by profileManager.totalLinesCleared.collectAsState()
-                val totalRuns by profileManager.totalRuns.collectAsState()
-                val highestSector by profileManager.highestSectorCleared.collectAsState()
-
-                val liveAchievements = listOf(
-                    TierAchievement("a1", AchievementTier.TIER_01, "First Surge", "Complete your first match", totalRuns, 1, 50, claimedIds.contains("a1")),
-                    TierAchievement("a2", AchievementTier.TIER_01, "Line Breaker I", "Clear 100 lines total", totalLines, 100, 100, claimedIds.contains("a2")),
-                    TierAchievement("a3", AchievementTier.TIER_01, "Combo Apprentice", "Trigger a 3x Combo streak", maxCombo, 3, 100, claimedIds.contains("a3")),
-
-                    TierAchievement("a4", AchievementTier.TIER_02, "Combo Cadet", "Reach a 5x Combo streak", maxCombo, 5, 150, claimedIds.contains("a4")),
-                    TierAchievement("a5", AchievementTier.TIER_02, "Line Cleanser II", "Clear 500 lines total", totalLines, 500, 200, claimedIds.contains("a5")),
-                    TierAchievement("a6", AchievementTier.TIER_02, "Sector Pioneer", "Clear Sector 1 (Chrono Nexus)", if (highestSector >= 1) 1 else 0, 1, 250, claimedIds.contains("a6")),
-
-                    TierAchievement("a7", AchievementTier.TIER_03, "Combo Specialist", "Reach an 8x Combo streak", maxCombo, 8, 300, claimedIds.contains("a7")),
-                    TierAchievement("a8", AchievementTier.TIER_03, "Solar Foundry Purged", "Clear Sector 2 (Solar Foundry)", if (highestSector >= 2) 1 else 0, 1, 350, claimedIds.contains("a8")),
-                    TierAchievement("a9", AchievementTier.TIER_03, "High Score Operative", "Achieve a score of 15,000+ pts", highScore, 15000, 400, claimedIds.contains("a9")),
-
-                    TierAchievement("a10", AchievementTier.TIER_04, "Combo God", "Reach a 10x Overdrive Combo", maxCombo, 10, 500, claimedIds.contains("a10")),
-                    TierAchievement("a11", AchievementTier.TIER_04, "Abyssal Conqueror", "Clear Sector 3 (Void Abyss)", if (highestSector >= 3) 1 else 0, 1, 600, claimedIds.contains("a11")),
-                    TierAchievement("a12", AchievementTier.TIER_04, "Grandmaster Score", "Achieve a score of 50,000+ pts", highScore, 50000, 1000, claimedIds.contains("a12"))
-                )
-
-                val achievementScore = liveAchievements.filter { it.isClaimed }.sumOf { it.starReward }
-
                 TierAchievementsScreen(
-                    currentStarBalance = stars,
-                    totalAchievementScore = achievementScore,
-                    achievements = liveAchievements,
-                    onClaimReward = { id ->
-                        val ach = liveAchievements.find { it.id == id }
-                        if (ach != null && ach.isCompleted && !ach.isClaimed) {
-                            profileManager.claimAchievement(id, ach.starReward)
-                        }
-                    },
+                    profileManager = profileManager,
                     onBackToHub = { currentScreen = Screen.MAIN_MENU }
                 )
             }

@@ -1,5 +1,6 @@
 package com.example.gridsurge.ui
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -52,6 +53,7 @@ import com.example.gridsurge.ui.replay.ReplayTheaterScreen
 import com.example.gridsurge.ui.settings.SettingsDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun GameScreen(
@@ -255,7 +257,7 @@ fun GameScreen(
                 activeCores = activeProgressCount,
                 totalCores = activeBlueprint?.objective?.targetAmount ?: 1,
                 catalystsPurged = glitchPurged,
-                totalCatalysts = 20,
+                totalCatalysts = 35,
                 comboStreak = combo,
                 feverProgress = fProgress,
                 isFeverActive = feverActive,
@@ -419,9 +421,18 @@ fun GameScreen(
                                 Screen.TIME_BLITZ -> startTimeBlitzMatch()
                                 Screen.DAILY_GLITCH -> startGlitchMode()
                                 Screen.BLITZ_CLASH -> {
-                                    scope.launch {
-                                        val rivalReplay = ClashReplayRepository.fetchRandomRivalReplay()
-                                        startBlitzClashDuel(rivalReplay)
+                                    startBlitzClashDuel(null)
+                                    scope.launch(Dispatchers.IO) {
+                                        try {
+                                            val rivalReplay = ClashReplayRepository.fetchRandomRivalReplay()
+                                            if (rivalReplay != null) {
+                                                withContext(Dispatchers.Main) {
+                                                    gameViewRef?.startBlitzClashDuel(rivalReplay)
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e("GameScreen", "Failed fetching rival replay", e)
+                                        }
                                     }
                                 }
                                 Screen.GAME_ADVENTURE -> {
@@ -472,15 +483,17 @@ fun GameScreen(
                     ModalOrchestrator.dismissModal(ModalType.PAUSE)
                     gameViewRef?.resumeEngine()
                 },
-                onRestartClicked = {
-                    ModalOrchestrator.dismissModal(ModalType.PAUSE)
-                    score = 0L
-                    combo = 1
-                    linesClearedTotal = 0
-                    coresDestroyedTotal = 0
-                    activeProgressCount = 0
-                    relicManager.resetEnergy()
-                    gameViewRef?.quickRestartMatch()
+                onRestartClicked = if (gameMode == Screen.DAILY_GLITCH) null else {
+                    {
+                        ModalOrchestrator.dismissModal(ModalType.PAUSE)
+                        score = 0L
+                        combo = 1
+                        linesClearedTotal = 0
+                        coresDestroyedTotal = 0
+                        activeProgressCount = 0
+                        relicManager.resetEnergy()
+                        gameViewRef?.quickRestartMatch()
+                    }
                 },
                 onResetSectorRunClicked = if (gameMode == Screen.GAME_ADVENTURE) {
                     {
@@ -560,6 +573,7 @@ fun GameScreen(
                 objectiveType = activeBlueprint?.objective?.type ?: ObjectiveType.INFECTED_PURGE,
                 adventureCoreProgress = if (activeBlueprint != null) Pair(coresDestroyedTotal, activeBlueprint.objective.targetAmount) else null,
                 failureSubtitle = failureSubtitle,
+                isGlitchMode = (gameMode == Screen.DAILY_GLITCH),
                 onDeployEmp = {
                     if (starsBalance >= 50) {
                         profileManager.addStarCurrency(-50)

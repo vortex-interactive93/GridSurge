@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedTextField
@@ -32,7 +33,10 @@ import com.example.gridsurge.audio.SfxType
 import com.example.gridsurge.meta.PlayerProfileManager
 import com.example.gridsurge.meta.util.CallsignValidationResult
 import com.example.gridsurge.meta.util.CallsignValidator
+import com.example.gridsurge.network.SupabaseClientProvider
 import com.example.gridsurge.ui.CyberChamferShape
+import io.github.jan.supabase.gotrue.auth
+import kotlinx.coroutines.launch
 
 data class CyberAvatarPreset(
     val id: String,
@@ -51,8 +55,7 @@ object CyberAvatarRegistry {
         CyberAvatarPreset("avatar_latino_male", "RAMIREZ // INTERCEPTOR", R.drawable.avatar_latino_male),
         CyberAvatarPreset("avatar_latina_female", "ELENA // INTERCEPTOR", R.drawable.avatar_latina_female),
         CyberAvatarPreset("avatar_middle_eastern_male", "TARIQ // COMMANDER", R.drawable.avatar_middle_eastern_male),
-        CyberAvatarPreset("avatar_middle_eastern_female", "AMIRA // COMMANDER", R.drawable.avatar_middle_eastern_female),
-        CyberAvatarPreset("avatar_cyber_ninja", "CYBER NINJA", R.drawable.ic_rival_ghost)
+        CyberAvatarPreset("avatar_middle_eastern_female", "AMIRA // COMMANDER", R.drawable.avatar_middle_eastern_female)
     )
 
     fun getPresetById(id: String): CyberAvatarPreset {
@@ -78,6 +81,22 @@ fun CyberProfileSetupDialog(
     var selectedTitle by remember { mutableStateOf(activeTitle) }
 
     val activeAvatar = CyberAvatarRegistry.getPresetById(selectedAvatarId)
+    val scope = rememberCoroutineScope()
+    val avatarListState = rememberLazyListState()
+
+    var authenticatedEmail by remember { mutableStateOf<String?>(null) }
+
+    // Check Supabase session for top account status pill
+    LaunchedEffect(Unit) {
+        if (SupabaseClientProvider.isConfigured) {
+            try {
+                val session = SupabaseClientProvider.client.auth.currentSessionOrNull()
+                if (session != null) {
+                    authenticatedEmail = session.user?.email
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -100,21 +119,52 @@ fun CyberProfileSetupDialog(
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Header Tag
-                Text(
-                    text = if (isPvpRequiredNotice) "CYBER PROFILE REQUIRED FOR PVP" else "NEURAL PROFILE CUSTOMIZATION",
-                    color = Color(0xFF00E5FF),
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp,
-                    textAlign = TextAlign.Center
-                )
+                // Top Account Link / Status Header Pill
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isPvpRequiredNotice) "CYBER PROFILE REQUIRED FOR PVP" else "NEURAL PROFILE CUSTOMIZATION",
+                        color = Color(0xFF00E5FF),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+
+                    if (authenticatedEmail != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0x2200E676))
+                                .border(1.dp, Color(0xFF00E676), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("✓ LINKED", color = Color(0xFF00E676), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                    } else if (onNavigateToAuth != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0x2200E5FF))
+                                .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(6.dp))
+                                .clickable {
+                                    SfxManager.playSfx(SfxType.UI_CONFIRM)
+                                    onNavigateToAuth()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("🔗 LINK ACCOUNT", color = Color(0xFF00E5FF), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
 
                 Text(
-                    text = "INITIALIZE OPERATIVE IDENT",
+                    text = activeAvatar.name,
                     color = Color.White,
                     fontSize = 18.sp,
                     fontFamily = FontFamily.Monospace,
@@ -122,13 +172,13 @@ fun CyberProfileSetupDialog(
                     textAlign = TextAlign.Center
                 )
 
-                // Avatar Preview Bezel (Flush Bottom Alignment, Bigger Scale)
+                // Avatar Preview Bezel (Flush Bottom Alignment, 110dp Scale)
                 Box(
                     modifier = Modifier
                         .size(110.dp)
                         .clip(CyberChamferShape)
                         .background(Color(0x66141926))
-                        .border(2.dp, Color(0xFF00E5FF), CyberChamferShape),
+                        .border(2.5.dp, Color(0xFF00E5FF), CyberChamferShape),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     Image(
@@ -140,51 +190,100 @@ fun CyberProfileSetupDialog(
                     )
                 }
 
-                // Avatar Preset Selector Row
+                // Avatar Preset Selector Row with < and > Scroll Arrows
                 Text(
-                    text = "SELECT AVATAR EMBLEM",
+                    text = "SELECT OPERATIVE EMBLEM",
                     color = Color(0xFF90A4AE),
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
                 )
 
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(CyberAvatarRegistry.PRESETS, key = { it.id }) { preset ->
-                        val isSelected = preset.id == selectedAvatarId
-                        Box(
-                            modifier = Modifier
-                                .size(68.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) Color(0x6600E5FF) else Color(0x22141926))
-                                .border(
-                                    width = if (isSelected) 2.dp else 1.dp,
-                                    color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF26334D),
-                                    shape = RoundedCornerShape(10.dp)
+                    // Left Scroll Arrow <
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x33141926))
+                            .border(1.dp, Color(0xAA00E5FF), CircleShape)
+                            .clickable {
+                                SfxManager.playSfx(SfxType.SNAP_TICK)
+                                val currIndex = CyberAvatarRegistry.PRESETS.indexOfFirst { it.id == selectedAvatarId }
+                                val prevIndex = if (currIndex > 0) currIndex - 1 else CyberAvatarRegistry.PRESETS.size - 1
+                                selectedAvatarId = CyberAvatarRegistry.PRESETS[prevIndex].id
+                                scope.launch {
+                                    avatarListState.animateScrollToItem(prevIndex)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("‹", color = Color(0xFF00E5FF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    LazyRow(
+                        state = avatarListState,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(CyberAvatarRegistry.PRESETS, key = { it.id }) { preset ->
+                            val isSelected = preset.id == selectedAvatarId
+                            Box(
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) Color(0x6600E5FF) else Color(0x22141926))
+                                    .border(
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF26334D),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable {
+                                        SfxManager.playSfx(SfxType.SNAP_TICK)
+                                        selectedAvatarId = preset.id
+                                    },
+                                contentAlignment = Alignment.BottomCenter
+                            ) {
+                                Image(
+                                    painter = painterResource(id = preset.iconRes),
+                                    contentDescription = preset.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                    alignment = Alignment.BottomCenter
                                 )
-                                .clickable {
-                                    SfxManager.playSfx(SfxType.SNAP_TICK)
-                                    selectedAvatarId = preset.id
-                                },
-                            contentAlignment = Alignment.BottomCenter
-                        ) {
-                            Image(
-                                painter = painterResource(id = preset.iconRes),
-                                contentDescription = preset.name,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                alignment = Alignment.BottomCenter
-                            )
+                            }
                         }
+                    }
+
+                    // Right Scroll Arrow >
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x33141926))
+                            .border(1.dp, Color(0xAA00E5FF), CircleShape)
+                            .clickable {
+                                SfxManager.playSfx(SfxType.SNAP_TICK)
+                                val currIndex = CyberAvatarRegistry.PRESETS.indexOfFirst { it.id == selectedAvatarId }
+                                val nextIndex = (currIndex + 1) % CyberAvatarRegistry.PRESETS.size
+                                selectedAvatarId = CyberAvatarRegistry.PRESETS[nextIndex].id
+                                scope.launch {
+                                    avatarListState.animateScrollToItem(nextIndex)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("›", color = Color(0xFF00E5FF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 // Callsign Input Field with Live Esports Standard Validation
                 val validationResult = remember(inputCallsign) { 
-                    CallsignValidator.validate(inputCallsign)
+                    CallsignValidator.validate(inputCallsign) 
                 }
                 val isValid = validationResult is CallsignValidationResult.Valid
 
@@ -204,7 +303,6 @@ fun CyberProfileSetupDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Real-Time Validation Feedback Tag
                     val feedbackText = when (validationResult) {
                         is CallsignValidationResult.Valid -> "✓ Callsign Valid & Ready"
                         is CallsignValidationResult.Invalid -> "✕ ${validationResult.reason}"
@@ -221,7 +319,7 @@ fun CyberProfileSetupDialog(
                     )
                 }
 
-                // Title Selector Dropdown / Chips
+                // Title Selector Chips Row
                 if (unlockedTitles.isNotEmpty()) {
                     Text(
                         text = "ACTIVE TITLE",
@@ -257,30 +355,6 @@ fun CyberProfileSetupDialog(
                                 )
                             }
                         }
-                    }
-                }
-
-                if (onNavigateToAuth != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(38.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0x2200E5FF))
-                            .border(1.dp, Color(0x8800E5FF), RoundedCornerShape(8.dp))
-                            .clickable {
-                                SfxManager.playSfx(SfxType.UI_CONFIRM)
-                                onNavigateToAuth()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "LINK GOOGLE / SOCIAL ACCOUNT →",
-                            color = Color(0xFF00E5FF),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
                     }
                 }
 

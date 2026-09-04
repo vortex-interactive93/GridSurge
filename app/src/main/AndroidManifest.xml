@@ -26,6 +26,14 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep Link Intent Filter for Supabase Auth OAuth Redirects -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="gridsurge" android:host="auth-callback" />
+            </intent-filter>
         </activity>
 
         <!-- AdMob Sample Application ID for Development/Testing -->

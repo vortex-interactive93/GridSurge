@@ -252,69 +252,7 @@ fun CyberAuthScreen(
                 }
             }
 
-            // 2. Social OAuth Grid (Facebook & TikTok)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Facebook Button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x331877F2))
-                        .border(1.dp, Color(0xFF1877F2), RoundedCornerShape(12.dp))
-                        .clickable(enabled = !isAuthenticating) {
-                            SfxManager.playSfx(SfxType.UI_CONFIRM)
-                            authFeedbackMessage = "CONNECTING FACEBOOK OAUTH..."
-                            scope.launch {
-                                try {
-                                    if (SupabaseClientProvider.isConfigured) {
-                                        SupabaseClientProvider.client.auth.signInWith(Facebook)
-                                    } else {
-                                        authFeedbackMessage = "FACEBOOK LINK SUCCESSFUL ✓"
-                                    }
-                                } catch (e: Exception) {
-                                    authFeedbackMessage = "FACEBOOK ERROR: ${e.message}"
-                                }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("FACEBOOK LINK", color = Color(0xFF1877F2), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                }
-
-                // TikTok Button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x33FE2C55))
-                        .border(1.dp, Color(0xFFFE2C55), RoundedCornerShape(12.dp))
-                        .clickable(enabled = !isAuthenticating) {
-                            SfxManager.playSfx(SfxType.UI_CONFIRM)
-                            authFeedbackMessage = "CONNECTING TIKTOK OAUTH..."
-                            scope.launch {
-                                try {
-                                    if (SupabaseClientProvider.isConfigured) {
-                                        authFeedbackMessage = "TIKTOK LINK SUCCESSFUL ✓"
-                                    } else {
-                                        authFeedbackMessage = "TIKTOK LINK SUCCESSFUL ✓"
-                                    }
-                                } catch (e: Exception) {
-                                    authFeedbackMessage = "TIKTOK ERROR: ${e.message}"
-                                }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("TIKTOK LINK", color = Color(0xFFFE2C55), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                }
-            }
-
-            // 3. Email / OTP Magic Link Card
+            // 2. Email / OTP Magic Link Card
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
 
 class PlayerProfileManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("grid_surge_profile", Context.MODE_PRIVATE)
@@ -105,6 +106,57 @@ class PlayerProfileManager(context: Context) {
         prefs.getStringSet("claimed_achievements", emptySet()) ?: emptySet<String>()
     )
     val claimedAchievementIds = _claimedAchievementIds.asStateFlow()
+
+    private val _claimedChainTiers = MutableStateFlow<Map<String, Int>>(loadClaimedChainTiers())
+    val claimedChainTiers = _claimedChainTiers.asStateFlow()
+
+    private fun loadClaimedChainTiers(): Map<String, Int> {
+        val jsonStr = prefs.getString("claimed_chain_tiers_json", "{}") ?: "{}"
+        return try {
+            val json = JSONObject(jsonStr)
+            val map = mutableMapOf<String, Int>()
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                map[key] = json.getInt(key)
+            }
+            map
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun claimChainTier(chainId: String, tierLevel: Int, starReward: Int): Boolean {
+        val currentTiers = _claimedChainTiers.value.toMutableMap()
+        val currentLevel = currentTiers[chainId] ?: 0
+        if (tierLevel == currentLevel + 1) {
+            currentTiers[chainId] = tierLevel
+            val newStars = starCurrency.value + starReward
+            
+            val json = JSONObject()
+            currentTiers.forEach { (k, v) -> json.put(k, v) }
+
+            prefs.edit().apply {
+                putString("claimed_chain_tiers_json", json.toString())
+                putInt("star_currency", newStars)
+            }.apply()
+
+            _claimedChainTiers.value = currentTiers
+            _starCurrency.value = newStars
+            return true
+        }
+        return false
+    }
+
+    private val _lastGlitchSeedDate = MutableStateFlow(
+        prefs.getString("last_glitch_seed_date", "") ?: ""
+    )
+    val lastGlitchSeedDate = _lastGlitchSeedDate.asStateFlow()
+
+    fun consumeGlitchTicket(todaySeedDate: String) {
+        prefs.edit().putString("last_glitch_seed_date", todaySeedDate).apply()
+        _lastGlitchSeedDate.value = todaySeedDate
+    }
 
     fun markFtueCompleted() {
         prefs.edit().putBoolean("ftue_completed", true).apply()

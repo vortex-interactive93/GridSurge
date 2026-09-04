@@ -22,8 +22,7 @@ class GlitchModeController(
         )
 
         if (turnResult.purgedCount > 0) {
-            juice.triggerGlitchFlash(1.0f)
-            juice.triggerShake(0.7f)
+            juice.triggerShake(0.5f)
         }
 
         turnResult.spreadEvents.forEach { event ->

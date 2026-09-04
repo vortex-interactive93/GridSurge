@@ -1,5 +1,6 @@
 package com.example.gridsurge.ui.glitch
 
+import android.app.Activity
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.gridsurge.ads.AdManager
 import java.util.Locale
 import com.example.gridsurge.audio.SfxManager
 import com.example.gridsurge.audio.SfxType
@@ -43,8 +46,8 @@ private val CardBorder = Color(0xFF1B2A42)
 @Composable
 fun DailyGlitchEntryDialog(
     uiState: DailyGlitchUiState,
+    isNoAdsPurchased: Boolean = false,
     onLaunchMission: () -> Unit,
-    onRetryWithStars: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var countdownText by remember { mutableStateOf(uiState.formattedTimeRemaining) }
@@ -264,6 +267,9 @@ fun DailyGlitchEntryDialog(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Action Controls
+                    val context = LocalContext.current
+                    val activity = context as? Activity
+
                     if (uiState.hasTicketAvailable) {
                         CyberActionButton(
                             text = "INITIALIZE PROTOCOL",
@@ -274,14 +280,30 @@ fun DailyGlitchEntryDialog(
                                 onLaunchMission()
                             }
                         )
+                    } else if (isNoAdsPurchased) {
+                        CyberActionButton(
+                            text = "BONUS RETRY [NO-ADS PASS ✓]",
+                            primaryColor = NeonGlitchGreen,
+                            isPrimary = true,
+                            onClick = {
+                                SfxManager.playSfx(SfxType.LEVEL_COMPLETE)
+                                onLaunchMission()
+                            }
+                        )
                     } else {
                         CyberActionButton(
-                            text = "RETRY PROTOCOL (${uiState.retryStarCost} ★)",
+                            text = "RE-TRY SEED [WATCH AD]",
                             primaryColor = Color(0xFFFFD600),
                             isPrimary = true,
                             onClick = {
                                 SfxManager.playSfx(SfxType.UI_CONFIRM)
-                                onRetryWithStars()
+                                if (activity != null) {
+                                    AdManager.showRewardedAd(activity, isNoAdsPurchased) {
+                                        onLaunchMission()
+                                    }
+                                } else {
+                                    onLaunchMission()
+                                }
                             }
                         )
                     }

@@ -26,6 +26,7 @@ fun MatrixFailureReviveDialog(
     objectiveType: ObjectiveType = ObjectiveType.INFECTED_PURGE,
     adventureCoreProgress: Pair<Int, Int>? = null, // (neutralized, total)
     failureSubtitle: String? = null,
+    isGlitchMode: Boolean = false,
     onDeployEmp: () -> Unit,
     onReboot: () -> Unit,
     onAbort: () -> Unit
@@ -111,7 +112,7 @@ fun MatrixFailureReviveDialog(
             }
 
             // REVIVE OPTION
-            if (canRevive) {
+            if (canRevive && !isGlitchMode) {
                 TacticalButton(
                     label = "DEPLOY EMP SURGE [50 ★]",
                     color = Color(0xFF00E5FF),
@@ -128,13 +129,15 @@ fun MatrixFailureReviveDialog(
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            TacticalButton(
-                label = "REBOOT MATRIX",
-                color = Color(0xFF00FF66),
-                onClick = onReboot
-            )
+            if (!isGlitchMode) {
+                TacticalButton(
+                    label = "REBOOT MATRIX",
+                    color = Color(0xFF00FF66),
+                    onClick = onReboot
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+            }
 
             TacticalButton(
                 label = "ABORT TO HUB",

@@ -143,6 +143,7 @@ class GridSurgeGameView @JvmOverloads constructor(
     var currentScore: Long = 0L
     var movesPlayedThisStage = 0
     var elapsedSeconds = 0
+    private var matchElapsedAccSec = 0f
     var activeThemeKey: String = ThemeNormalizer.GLASS
         set(value) {
             val canonical = ThemeNormalizer.normalize(value)
@@ -249,7 +250,7 @@ class GridSurgeGameView @JvmOverloads constructor(
             juiceFx.updateFrame(dt)
             interactionHandler.updatePhysics(dt)
 
-            // Live Time Blitz countdown & state management
+            // Live Time Blitz countdown or elapsed match timer
             if (isTimeBlitzModeActive) {
                 val blitzState = blitzEngine.updateFrame(dt)
                 val updatedSec = blitzEngine.secondsRemaining.toInt()
@@ -260,6 +261,13 @@ class GridSurgeGameView @JvmOverloads constructor(
                 if (blitzState == BlitzState.TIME_EXPIRED) {
                     isEnginePaused = true
                     onGameOver?.invoke()
+                }
+            } else if (!isClashModeActive) {
+                matchElapsedAccSec += dt
+                val updatedSec = matchElapsedAccSec.toInt()
+                if (updatedSec != elapsedSeconds) {
+                    elapsedSeconds = updatedSec
+                    notifyAdventureState()
                 }
             }
         }
@@ -587,7 +595,35 @@ class GridSurgeGameView @JvmOverloads constructor(
         }
 
         if (isTimeBlitzModeActive) currentScore = blitzController.processMove(result, engine.comboManager.currentStreak)
-        if (isGlitchModeActive) glitchController.processMove(result)
+        if (isGlitchModeActive) {
+            glitchController.processMove(result)
+            val targetPurge = 25
+            if (glitchEngine.totalPurgedCount >= targetPurge && !isObjectiveMet) {
+                isObjectiveMet = true
+                isEnginePaused = true
+                SfxManager.playSfx(SfxType.LEVEL_COMPLETE)
+                SfxManager.playVox(VoxAction.OBJECTIVE_DONE)
+                val evalResult = StarEvaluationResult(
+                    totalStars = 3,
+                    star1Secured = true,
+                    star2Secured = true,
+                    star3Secured = true,
+                    star1Title = "GLITCH PURGED",
+                    star2Title = "GRID CLEARED",
+                    star3Title = "TIME RECORD",
+                    star1Detail = "35/35 Catalysts Cleared",
+                    star2Detail = "Purity Target Reached",
+                    star3Detail = "Elite Reaction Speed"
+                )
+                onStageVictoryEvaluated?.invoke(
+                    1,
+                    currentScore,
+                    evalResult,
+                    elapsedSeconds
+                )
+                return
+            }
+        }
         if (!isAdventureModeActive && !isTimeBlitzModeActive && !isGlitchModeActive) classicController.processMove(result)
         
         // Resonance Overclock: +25% score bonus while Warp is ready

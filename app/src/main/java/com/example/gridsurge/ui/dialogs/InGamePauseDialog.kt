@@ -27,7 +27,7 @@ import com.example.gridsurge.ui.CyberChamferShape
 @Composable
 fun InGamePauseDialog(
     onResumeClicked: () -> Unit,
-    onRestartClicked: () -> Unit,
+    onRestartClicked: (() -> Unit)? = null,
     onResetSectorRunClicked: (() -> Unit)? = null,
     onSettingsClicked: () -> Unit,
     onQuitClicked: () -> Unit,
@@ -233,12 +233,14 @@ fun InGamePauseDialog(
                     onClick = onSettingsClicked
                 )
 
-                CyberActionButton(
-                    text = "RESTART MATCH",
-                    primaryColor = Color(0xFFFFD600),
-                    isPrimary = false,
-                    onClick = onRestartClicked
-                )
+                if (onRestartClicked != null) {
+                    CyberActionButton(
+                        text = "RESTART MATCH",
+                        primaryColor = Color(0xFFFFD600),
+                        isPrimary = false,
+                        onClick = onRestartClicked
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
