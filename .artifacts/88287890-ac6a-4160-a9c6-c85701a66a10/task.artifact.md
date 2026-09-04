@@ -1,0 +1,11 @@
+- [ ] Fix Crash on 1x1 Warp/Bomb Drag
+    - [ ] Update `SpecialBlockSolver.evaluateSpecialClear` with radial targeting and clamping
+    - [ ] Verify `renderSpecialHoverIndicator` in `GridSurgeGameView`
+- [ ] Fix Mission Objective Star Evaluator Logic Bug
+    - [ ] Update `completeCommitCycle` in `GridSurgeGameView` to track `maxSimultaneousLinesCleared`
+- [ ] Improve Touch Input Ergonomics
+    - [ ] Increase `liftOffset` in `GridSurgeGameView`
+- [ ] Fix Augment Reroll Deduplication
+    - [ ] Update `NeuralAugmentDraftManager.rollAugmentDraft` to filter installed augments
+- [ ] Verify Z-Index Layering
+    - [ ] Check `scorePopupManager.render` position in `onDraw`
