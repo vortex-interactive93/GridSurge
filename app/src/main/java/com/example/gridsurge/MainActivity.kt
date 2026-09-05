@@ -1,5 +1,6 @@
 package com.example.gridsurge
 
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -11,6 +12,7 @@ import com.example.gridsurge.audio.BgmManager
 import com.example.gridsurge.audio.SfxManager
 import com.example.gridsurge.audio.VoicePackId
 import com.example.gridsurge.billing.BillingManager
+import com.example.gridsurge.game.util.DisplayMetricsPreloader
 import com.example.gridsurge.meta.PlayerProfileManager
 import com.example.gridsurge.meta.SkinThemeManager
 import com.example.gridsurge.settings.SettingsManager
@@ -29,10 +31,10 @@ class MainActivity : ComponentActivity() {
         SettingsManager.getInstance(this)
         AdManager.initialize(this)
         BillingManager.initialize(this, PlayerProfileManager(this))
-        com.example.gridsurge.game.util.DisplayMetricsPreloader.prewarm(this)
+        DisplayMetricsPreloader.prewarm(this)
         
         // Restore user's customized Announcer Pack
-        val savedPackName = getSharedPreferences("gridsurge_prefs", android.content.Context.MODE_PRIVATE)
+        val savedPackName = getSharedPreferences("gridsurge_prefs", MODE_PRIVATE)
             .getString("equipped_voice", VoicePackId.CYBER_AI.name) ?: VoicePackId.CYBER_AI.name
         
         SfxManager.activeVoicePack = runCatching { 
@@ -55,6 +57,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         BgmManager.resume()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

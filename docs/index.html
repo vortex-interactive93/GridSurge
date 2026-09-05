@@ -3,19 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GridSurge — Official Tactical Block Puzzle Game</title>
+    <title>GridSurge — Official 3D Tactical Block Puzzle Game</title>
+    <meta name="description" content="Official website for GridSurge — Esports-grade 3D tactical block puzzle featuring 1v1 PvP ghost duels, 27 sector campaign, 3D custom skins, and daily glitch seeds.">
+    <link rel="icon" href="images/logo_title.png" type="image/png">
+
     <style>
         :root {
-            --bg-color: #040812;
-            --card-bg: rgba(13, 21, 38, 0.85);
-            --card-border: #1e2d4a;
+            --bg-color: #030712;
+            --card-bg: rgba(13, 21, 38, 0.88);
+            --card-border: rgba(30, 45, 74, 0.8);
             --primary-cyan: #00E5FF;
-            --accent-gold: #FFD600;
+            --accent-gold: #FFB300;
             --accent-green: #00E676;
             --accent-magenta: #D500F9;
             --accent-red: #FF1744;
-            --text-color: #f1f5f9;
-            --subtext-color: #94a3b8;
+            --text-color: #F8FAFC;
+            --subtext-color: #94A3B8;
+            --glow-cyan: 0 0 25px rgba(0, 229, 255, 0.35);
+            --glow-gold: 0 0 25px rgba(255, 179, 0, 0.35);
         }
 
         * {
@@ -27,48 +32,72 @@
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
             background-color: var(--bg-color);
             background-image:
-                radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.12) 0%, transparent 60%),
-                radial-gradient(circle at 80% 100%, rgba(213, 0, 249, 0.10) 0%, transparent 50%);
+                radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.15) 0%, transparent 55%),
+                radial-gradient(circle at 85% 60%, rgba(213, 0, 249, 0.10) 0%, transparent 45%),
+                radial-gradient(circle at 15% 90%, rgba(0, 230, 118, 0.08) 0%, transparent 45%);
             color: var(--text-color);
             margin: 0;
             padding: 0;
             line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated Perspective Background Canvas */
+        #grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.25;
         }
 
         .container {
-            max-width: 1080px;
+            max-width: 1140px;
             margin: 0 auto;
             padding: 20px;
         }
 
-        /* Floating Nav Bar */
+        /* Floating Cyber Navbar */
         .navbar {
             position: sticky;
-            top: 20px;
-            z-index: 100;
-            background: rgba(13, 21, 38, 0.9);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(0, 229, 255, 0.3);
-            border-radius: 50px;
-            padding: 8px 28px;
+            top: 16px;
+            z-index: 1000;
+            background: rgba(10, 16, 28, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 229, 255, 0.35);
+            border-radius: 60px;
+            padding: 10px 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 40px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(0, 229, 255, 0.1);
         }
 
-        .nav-logo {
-            font-size: 1.4rem;
-            font-weight: 900;
-            color: var(--primary-cyan);
-            letter-spacing: 2px;
-            text-transform: uppercase;
+        .nav-logo-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-logo-box img {
+            height: 52px;
+            width: auto;
+            filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.5));
+            transition: transform 0.3s ease;
+        }
+
+        .nav-logo-box img:hover {
+            transform: scale(1.05);
         }
 
         .nav-links {
             display: flex;
-            gap: 24px;
+            gap: 28px;
             list-style: none;
             margin: 0;
             padding: 0;
@@ -76,127 +105,138 @@
 
         .nav-links a {
             color: var(--subtext-color);
-            font-weight: 700;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
+            font-weight: 800;
+            font-size: 0.88rem;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
-            transition: color 0.2s ease;
+            text-decoration: none;
+            transition: color 0.2s ease, text-shadow 0.2s ease;
         }
 
         .nav-links a:hover {
             color: var(--primary-cyan);
-            text-decoration: none;
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
         }
 
-        .btn-download {
-            background: linear-gradient(90deg, var(--accent-gold), #ffab00);
+        .btn-nav-download {
+            background: linear-gradient(90deg, var(--accent-gold), #FF8F00);
             color: #040812;
-            padding: 10px 22px;
+            padding: 10px 24px;
             border-radius: 30px;
             font-weight: 900;
             font-size: 0.85rem;
-            letter-spacing: 1px;
+            letter-spacing: 1.2px;
             text-transform: uppercase;
-            box-shadow: 0 0 15px rgba(255, 214, 0, 0.4);
+            text-decoration: none;
+            box-shadow: 0 0 20px rgba(255, 179, 0, 0.4);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .btn-download:hover {
-            transform: scale(1.04);
-            box-shadow: 0 0 25px rgba(255, 214, 0, 0.6);
-            text-decoration: none;
+        .btn-nav-download:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 179, 0, 0.7);
         }
 
         /* Hero Main Section */
         .hero-card {
             background: var(--card-bg);
             border: 1.5px solid var(--primary-cyan);
-            border-radius: 28px;
+            border-radius: 32px;
             padding: 50px 40px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 40px;
             align-items: center;
-            box-shadow: 0 0 40px rgba(0, 229, 255, 0.15);
+            box-shadow: var(--glow-cyan);
             margin-bottom: 50px;
+            position: relative;
+            overflow: hidden;
         }
 
         .hero-text h1 {
-            font-size: 2.8rem;
+            font-size: 2.9rem;
             line-height: 1.1;
             margin: 0 0 15px;
             color: #ffffff;
+            font-weight: 900;
             text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .hero-text h1 span {
             color: var(--primary-cyan);
-            text-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+            text-shadow: 0 0 25px rgba(0, 229, 255, 0.6);
         }
 
         .hero-subtitle {
             color: var(--accent-gold);
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             font-weight: 800;
-            letter-spacing: 1.5px;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .hero-desc {
             color: var(--subtext-color);
             font-size: 1.05rem;
             margin-bottom: 30px;
+            line-height: 1.7;
         }
 
-        .store-buttons {
+        .feature-chips-row {
             display: flex;
-            gap: 16px;
+            gap: 10px;
             flex-wrap: wrap;
+            margin-bottom: 30px;
         }
 
-        .badge-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            background: #000000;
-            border: 1px solid #334155;
-            border-radius: 14px;
-            padding: 12px 20px;
-            color: white;
-            font-weight: 700;
-            transition: border-color 0.2s ease;
-        }
-
-        .badge-btn:hover {
-            border-color: var(--primary-cyan);
-            text-decoration: none;
-        }
-
-        .badge-btn span {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-
-        .badge-btn .small {
-            font-size: 0.65rem;
-            color: var(--subtext-color);
+        .chip {
+            background: rgba(0, 229, 255, 0.1);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            color: var(--primary-cyan);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 1px;
             text-transform: uppercase;
         }
 
-        .badge-btn .large {
-            font-size: 0.95rem;
-            font-weight: 800;
+        .play-badge-link img {
+            height: 120px;
+            width: auto;
+            border-radius: 16px;
+            filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.5));
+            transition: transform 0.25 ease, filter 0.25s ease;
         }
 
-        /* Feature Section */
+        .play-badge-link img:hover {
+            transform: scale(1.04);
+            filter: drop-shadow(0 0 30px rgba(0, 229, 255, 0.8));
+        }
+
+        .hero-banner-img {
+            width: 100%;
+            height: auto;
+            border-radius: 22px;
+            border: 1.5px solid var(--primary-cyan);
+            box-shadow: 0 0 35px rgba(0, 229, 255, 0.4);
+            transition: transform 0.3s ease;
+        }
+
+        .hero-banner-img:hover {
+            transform: scale(1.02);
+        }
+
+        /* Section Cards */
         .section-card {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
-            border-radius: 28px;
-            padding: 40px;
+            border-radius: 32px;
+            padding: 45px 40px;
             margin-bottom: 50px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
         }
 
         .section-header {
@@ -208,64 +248,115 @@
             color: var(--primary-cyan);
             font-size: 0.85rem;
             font-weight: 800;
-            letter-spacing: 2px;
+            letter-spacing: 2.5px;
             text-transform: uppercase;
         }
 
         .section-header h2 {
-            font-size: 2.2rem;
-            margin: 5px 0 0;
+            font-size: 2.3rem;
+            margin: 6px 0 0;
             text-transform: uppercase;
             color: #ffffff;
+            letter-spacing: 1px;
         }
 
+        /* 5 Game Modes Grid */
         .modes-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+            gap: 22px;
         }
 
         .mode-box {
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.85);
             border: 1px solid var(--card-border);
-            border-radius: 18px;
-            padding: 24px;
-            transition: transform 0.2s ease, border-color 0.2s ease;
+            border-radius: 20px;
+            padding: 26px;
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
         }
 
         .mode-box:hover {
-            transform: translateY(-4px);
+            transform: translateY(-6px);
             border-color: var(--primary-cyan);
+            box-shadow: 0 10px 30px rgba(0, 229, 255, 0.2);
         }
 
         .mode-box h3 {
             margin-top: 0;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            font-weight: 900;
         }
 
         .mode-box p {
             color: var(--subtext-color);
             font-size: 0.95rem;
             margin-bottom: 0;
+            line-height: 1.6;
+        }
+
+        /* Operative Roster Carousel Showcase */
+        .roster-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+        }
+
+        .avatar-card {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 18px;
+            text-align: center;
+            transition: transform 0.25s ease, border-color 0.25s ease;
+        }
+
+        .avatar-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary-cyan);
+        }
+
+        .avatar-card img {
+            width: 100%;
+            max-width: 110px;
+            height: auto;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            border: 1.5px solid var(--primary-cyan);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+        }
+
+        .avatar-card .name {
+            font-weight: 900;
+            font-size: 0.95rem;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .avatar-card .role {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: var(--accent-gold);
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
 
         /* Interactive FAQ Accordion */
         .faq-item {
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.85);
             border: 1px solid var(--card-border);
-            border-radius: 16px;
+            border-radius: 18px;
             margin-bottom: 14px;
             overflow: hidden;
-            transition: border-color 0.2s ease;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
         }
 
         .faq-question {
-            padding: 20px 24px;
+            padding: 22px 28px;
             font-weight: 800;
-            font-size: 1.05rem;
+            font-size: 1.1rem;
             color: #ffffff;
             cursor: pointer;
             display: flex;
@@ -279,10 +370,11 @@
         }
 
         .faq-answer {
-            padding: 0 24px 20px;
+            padding: 0 28px 24px;
             color: var(--subtext-color);
-            font-size: 0.95rem;
+            font-size: 0.98rem;
             display: none;
+            line-height: 1.7;
         }
 
         .faq-item.active .faq-answer {
@@ -291,52 +383,72 @@
 
         .faq-item.active {
             border-color: var(--primary-cyan);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+        }
+
+        .faq-toggle-icon {
+            font-size: 1.3rem;
+            color: var(--primary-cyan);
+            font-weight: 900;
         }
 
         /* Footer Section */
         footer {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
-            border-radius: 28px;
-            padding: 40px;
+            border-radius: 32px;
+            padding: 45px;
             margin-bottom: 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .footer-logo img {
+            max-width: 220px;
+            height: auto;
+            margin-bottom: 12px;
+            filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.4));
         }
 
         .footer-info p {
-            margin: 5px 0 0;
+            margin: 4px 0 0;
             color: var(--subtext-color);
-            font-size: 0.85rem;
+            font-size: 0.88rem;
         }
 
         .footer-links {
             display: flex;
-            gap: 20px;
+            gap: 24px;
         }
 
         .footer-links a {
             color: var(--subtext-color);
-            font-weight: 700;
+            font-weight: 800;
             font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: color 0.2s ease;
         }
 
         .footer-links a:hover {
             color: var(--primary-cyan);
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 868px) {
             .hero-card {
                 grid-template-columns: 1fr;
-                padding: 30px 20px;
+                padding: 35px 24px;
             }
             .navbar {
                 flex-direction: column;
-                gap: 15px;
-                border-radius: 24px;
+                gap: 16px;
+                border-radius: 30px;
+                padding: 18px 24px;
             }
             footer {
                 flex-direction: column;
@@ -346,62 +458,75 @@
     </style>
 </head>
 <body>
+    <!-- Background Animated Perspective Grid -->
+    <canvas id="grid-bg"></canvas>
+
     <div class="container">
-        <!-- Floating Navigation Bar -->
+        <!-- Floating Cyber Navbar -->
         <nav class="navbar">
-            <div class="nav-logo">
-                <img src="images/logo_title.png" alt="GRID SURGE" style="height: 54px; width: auto; vertical-align: middle; filter: drop-shadow(0 0 12px rgba(0,229,255,0.5));" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
-                <span style="display:none;">GRID SURGE</span>
+            <div class="nav-logo-box">
+                <img src="images/logo_title.png" alt="GRID SURGE" onerror="this.style.display='none';">
             </div>
             <ul class="nav-links">
                 <li><a href="#about">ABOUT</a></li>
                 <li><a href="#modes">MODES</a></li>
+                <li><a href="#roster">OPERATIVES</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#privacy">PRIVACY</a></li>
                 <li><a href="#terms">TERMS</a></li>
             </ul>
-            <a href="#download" class="btn-download">GET THE GAME</a>
+            <a href="#download" class="btn-nav-download">GET THE GAME</a>
         </nav>
 
         <!-- Hero Card Showcase -->
         <section class="hero-card" id="about">
             <div class="hero-text">
                 <div class="hero-subtitle">TAKE CONTROL OF THE MATRIX</div>
-                <h1>THE ULTIMATE <span>BLOCK PUZZLE</span> EXPERIENCE</h1>
-                <p class="hero-desc">GridSurge combines deep spatial puzzle mechanics, 100% uncompressed 3D customization, 1v1 PvP ghost duels, and an endless progressive campaign.</p>
-                <div class="store-buttons" id="download">
-                    <a href="#" style="display: inline-block; transition: transform 0.2s ease;">
-                        <img src="images/google_play_badge.png" alt="Get it on Google Play" style="height: 150px; width: auto; filter: drop-shadow(0 0 20px rgba(0,229,255,0.6)); border-radius: 16px;">
+                <h1>THE ULTIMATE <span>3D BLOCK PUZZLE</span> EXPERIENCE</h1>
+                <p class="hero-desc">GridSurge combines deep spatial block tactics, 100% uncompressed 3D skin customization, 1v1 PvP ghost duels, and an endless progressive sector campaign.</p>
+
+                <div class="feature-chips-row">
+                    <span class="chip">5 GAME MODES</span>
+                    <span class="chip">1V1 PVP DUELS</span>
+                    <span class="chip">3D CUSTOM SKINS</span>
+                    <span class="chip">OFFLINE READY</span>
+                </div>
+
+                <div id="download">
+                    <a href="https://play.google.com/store/apps/details?id=com.gridsurge.game" class="play-badge-link" target="_blank">
+                        <img src="images/google_play_badge.png" alt="Get it on Google Play">
                     </a>
                 </div>
             </div>
+
             <div style="text-align: center;">
-                <img src="images/hero_banner.png" alt="Grid Surge Hero Banner" style="width: 100%; border-radius: 20px; box-shadow: 0 0 35px rgba(0, 229, 255, 0.35); border: 1.5px solid var(--primary-cyan);" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <div style="display: none; background: rgba(0,229,255,0.05); border: 1px solid var(--primary-cyan); border-radius: 20px; padding: 40px 20px; box-shadow: inset 0 0 30px rgba(0,229,255,0.1);">
-                    <h2 style="color: var(--primary-cyan); font-size: 2.2rem; letter-spacing: 3px; margin: 0 0 10px;">GRID SURGE</h2>
-                    <p style="color: var(--accent-gold); font-weight: 800; letter-spacing: 1.5px; margin: 0;">ESPORTS-GRADE TACTICAL BLOCK PUZZLE</p>
-                </div>
+                <img src="images/hero_banner.png" alt="Grid Surge Hero Banner" class="hero-banner-img">
             </div>
         </section>
 
-        <!-- What is GridSurge Section -->
+        <!-- 5 Unique Game Modes Section -->
         <section class="section-card" id="modes">
             <div class="section-header">
                 <div class="sub">MISSION PROTOCOLS</div>
                 <h2>5 UNIQUE GAME MODES</h2>
             </div>
+
+            <div style="text-align: center; margin-bottom: 35px;">
+                <img src="images/laser_shatter.png" alt="Laser Beam Block Shatter" style="max-width: 100%; height: auto; border-radius: 20px; box-shadow: 0 0 35px rgba(213,0,249,0.3); border: 1.5px solid var(--accent-magenta);">
+            </div>
+
             <div class="modes-grid">
                 <div class="mode-box">
                     <h3 style="color: var(--primary-cyan);">💠 Classic Mode</h3>
-                    <p>Deep spatial survival with 50/50 seed layouts, Cavity-Aware spawner, and Grid Purge Bounties.</p>
+                    <p>Deep spatial survival with 50/50 seed layouts, Cavity-Aware spawner, and Grid Purge Bounties for massive score multipliers.</p>
                 </div>
                 <div class="mode-box">
                     <h3 style="color: var(--accent-gold);">🟡 Adventure Sectors</h3>
-                    <p>27 handcrafted sector levels, Relic CyberWare abilities, and multi-phase Boss battles.</p>
+                    <p>27 handcrafted sector levels, Relic CyberWare abilities, 3-Star mastery feats, and multi-phase Boss battles.</p>
                 </div>
                 <div class="mode-box">
                     <h3 style="color: var(--accent-red);">❤️ Blitz Clash 1v1</h3>
-                    <p>75-second high-stakes PvP ghost rival duels with EMP Stasis Jammers and live Tug-of-War momentum.</p>
+                    <p>75-second high-stakes PvP ghost rival duels with EMP Stasis Jammers and live Tug-of-War momentum shifts.</p>
                 </div>
                 <div class="mode-box">
                     <h3 style="color: var(--accent-green);">💚 Daily Glitch</h3>
@@ -409,11 +534,62 @@
                 </div>
                 <div class="mode-box">
                     <h3 style="color: var(--accent-magenta);">💜 Time Blitz</h3>
-                    <p>90-second score sprint with 100% Fever Overdrive (2X) and Time Refunds.</p>
+                    <p>90-second score sprint with 100% Fever Overdrive (2X multiplier) and Time Refunds on multi-line clears.</p>
                 </div>
                 <div class="mode-box">
                     <h3 style="color: var(--primary-cyan);">🎨 3D Customization</h3>
                     <p>6 native 3D block skin sets, custom announcer VOX packs, and 10 Operative profile avatars.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Operative Roster Showcase -->
+        <section class="section-card" id="roster">
+            <div class="section-header">
+                <div class="sub">CHOOSE YOUR IDENTITY</div>
+                <h2>OPERATIVE ROSTER</h2>
+            </div>
+
+            <div class="roster-grid">
+                <div class="avatar-card">
+                    <div class="name">KAI</div>
+                    <div class="role">RECON // CLASS</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">LIN</div>
+                    <div class="role">RECON // CLASS</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">MALIK</div>
+                    <div class="role">VANGUARD // CLASS</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">NIA</div>
+                    <div class="role">VANGUARD // CLASS</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">COLE</div>
+                    <div class="role">TACTICAL // CLASS</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">AVA</div>
+                    <div class="role">TACTICAL // CLASS</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">RAMIREZ</div>
+                    <div class="role">INTERCEPTOR</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">ELENA</div>
+                    <div class="role">INTERCEPTOR</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">TARIQ</div>
+                    <div class="role">COMMANDER</div>
+                </div>
+                <div class="avatar-card">
+                    <div class="name">AMIRA</div>
+                    <div class="role">COMMANDER</div>
                 </div>
             </div>
         </section>
@@ -426,27 +602,27 @@
             </div>
 
             <div class="faq-item active">
-                <div class="faq-question">IS GRID SURGE FREE TO PLAY? <span>−</span></div>
-                <div class="faq-answer">Yes! GridSurge is 100% free to play on Android. Players can enjoy all 5 game modes, unlock custom block skins, and compete on global leaderboards without spending real money.</div>
+                <div class="faq-question">IS GRID SURGE FREE TO PLAY? <span class="faq-toggle-icon">−</span></div>
+                <div class="faq-answer">Yes! GridSurge is 100% free to play on Android. Players can enjoy all 5 game modes, unlock custom 3D block skins, and compete on global leaderboards without spending real money.</div>
             </div>
 
             <div class="faq-item">
-                <div class="faq-question">CAN I PLAY GRID SURGE OFFLINE? <span>+</span></div>
+                <div class="faq-question">CAN I PLAY GRID SURGE OFFLINE? <span class="faq-toggle-icon">+</span></div>
                 <div class="faq-answer">Absolutely! Classic Mode, Adventure Sectors, and Time Blitz can all be played 100% offline with zero internet connection required.</div>
             </div>
 
             <div class="faq-item">
-                <div class="faq-question">HOW DO BLITZ CLASH 1V1 PVP DUELS WORK? <span>+</span></div>
+                <div class="faq-question">HOW DO BLITZ CLASH 1V1 PVP DUELS WORK? <span class="faq-toggle-icon">+</span></div>
                 <div class="faq-answer">Blitz Clash matches you against real player ghost runs recorded worldwide. You compete head-to-head in a 75-second duel with EMP Stasis Jammers and live Tug-of-War momentum shifts!</div>
             </div>
 
             <div class="faq-item">
-                <div class="faq-question">WHAT IS THE NO-ADS PROTOCOL BUNDLE? <span>+</span></div>
+                <div class="faq-question">WHAT IS THE NO-ADS PROTOCOL BUNDLE? <span class="faq-toggle-icon">+</span></div>
                 <div class="faq-answer">The No-Ads Protocol Bundle permanently removes all forced post-match ads and gives you instant 1-tap claims for Revives and Double Stars, plus +1,000 Bonus Stars!</div>
             </div>
         </section>
 
-        <!-- Legal Privacy Policy & Terms -->
+        <!-- Legal Privacy Policy -->
         <section class="section-card" id="privacy">
             <div class="section-header">
                 <div class="sub">COMPLIANCE & LEGAL</div>
@@ -477,6 +653,7 @@
             <p style="color: var(--subtext-color);">You have the right to access, correct, or request deletion of your account data at any time. To request account deletion or data exports, contact us at: <a href="mailto:support@grid-surge.com">support@grid-surge.com</a>.</p>
         </section>
 
+        <!-- Legal Terms of Service -->
         <section class="section-card" id="terms">
             <div class="section-header">
                 <div class="sub">LEGAL AGREEMENT</div>
@@ -507,14 +684,16 @@
         <!-- Footer -->
         <footer>
             <div class="footer-info">
-                <img src="images/vortex_interactive_logo.png" alt="Grid Surge / Vortex Interactive" style="max-width: 220px; height: auto; margin-bottom: 12px; filter: drop-shadow(0 0 12px rgba(0,229,255,0.4));" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <div class="nav-logo" style="display:none;">GRID SURGE</div>
+                <div class="footer-logo">
+                    <img src="images/vortex_interactive_logo.png" alt="Vortex Interactive Studio" onerror="this.style.display='none';">
+                </div>
                 <p>&copy; 2026 GridSurge / Vortex Interactive. All rights reserved.</p>
                 <p>Developer Support: <a href="mailto:support@grid-surge.com">support@grid-surge.com</a></p>
             </div>
             <div class="footer-links">
                 <a href="#about">ABOUT</a>
                 <a href="#modes">MODES</a>
+                <a href="#roster">OPERATIVES</a>
                 <a href="#faq">FAQ</a>
                 <a href="#privacy">PRIVACY</a>
                 <a href="#terms">TERMS</a>
@@ -522,19 +701,69 @@
         </footer>
     </div>
 
-    <!-- FAQ Accordion JS -->
+    <!-- Background Cyber Grid Canvas Animation -->
     <script>
+        const canvas = document.getElementById('grid-bg');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let gridOffset = 0;
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.25)';
+            ctx.lineWidth = 1;
+
+            const w = canvas.width;
+            const h = canvas.height;
+            const horizonY = h * 0.45;
+            const numVertical = 20;
+
+            // Vertical Perspective Lines
+            for (let i = -numVertical; i <= numVertical; i++) {
+                const startX = w / 2 + (i * w / numVertical) * 0.1;
+                const endX = w / 2 + (i * w / numVertical) * 2.5;
+                ctx.beginPath();
+                ctx.moveTo(startX, horizonY);
+                ctx.lineTo(endX, h);
+                ctx.stroke();
+            }
+
+            // Horizontal Moving Lines
+            const numHorizontal = 12;
+            gridOffset = (gridOffset + 0.003) % 1;
+
+            for (let i = 0; i < numHorizontal; i++) {
+                const t = (i / numHorizontal + gridOffset) % 1;
+                const lineY = horizonY + (h - horizonY) * (t * t);
+                ctx.beginPath();
+                ctx.moveTo(0, lineY);
+                ctx.lineTo(w, lineY);
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(drawGrid);
+        }
+        drawGrid();
+
+        // FAQ Accordion Toggle
         document.querySelectorAll('.faq-question').forEach(q => {
             q.addEventListener('click', () => {
                 const item = q.parentElement;
                 const wasActive = item.classList.contains('active');
                 document.querySelectorAll('.faq-item').forEach(i => {
                     i.classList.remove('active');
-                    i.querySelector('.faq-question span').textContent = '+';
+                    i.querySelector('.faq-toggle-icon').textContent = '+';
                 });
                 if (!wasActive) {
                     item.classList.add('active');
-                    q.querySelector('span').textContent = '−';
+                    q.querySelector('.faq-toggle-icon').textContent = '−';
                 }
             });
         });

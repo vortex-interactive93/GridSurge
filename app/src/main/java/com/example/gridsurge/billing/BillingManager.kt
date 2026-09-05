@@ -36,7 +36,11 @@ object BillingManager : PurchasesUpdatedListener {
 
         billingClient = BillingClient.newBuilder(context)
             .setListener(this)
-            .enablePendingPurchases()
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder()
+                    .enableOneTimeProducts()
+                    .build()
+            )
             .build()
 
         connectToGooglePlay()
@@ -85,9 +89,10 @@ object BillingManager : PurchasesUpdatedListener {
             .setProductList(productList)
             .build()
 
-        billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
+        billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsResult ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val map = productDetailsList.associateBy { it.productId }
+                val detailsList = productDetailsResult.productDetailsList ?: emptyList()
+                val map = detailsList.associateBy { it.productId }
                 _productDetailsMap.value = map
                 Log.d(TAG, "Fetched ${map.size} products from Google Play Console!")
             } else {

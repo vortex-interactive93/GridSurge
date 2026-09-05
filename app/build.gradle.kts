@@ -14,8 +14,8 @@ android {
         applicationId = "com.gridsurge.game"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -56,8 +56,8 @@ dependencies {
     // Google Mobile Ads (AdMob) SDK
     implementation("com.google.android.gms:play-services-ads:23.3.0")
 
-    // Google Play Billing Library v7
-    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    // Google Play Billing Library v8
+    implementation("com.android.billingclient:billing-ktx:8.0.0")
 
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.postgrest)
