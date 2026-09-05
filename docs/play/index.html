@@ -18,7 +18,8 @@
             --accent-gold: #FFB300;
             --accent-green: #00E676;
             --accent-magenta: #D500F9;
-            --card-bg: rgba(13, 21, 38, 0.9);
+            --accent-red: #FF1744;
+            --card-bg: rgba(13, 21, 38, 0.92);
             --card-border: #1e2d4a;
         }
 
@@ -32,7 +33,7 @@
         body {
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
             background-color: var(--bg-color);
-            background-image: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.18) 0%, transparent 60%);
+            background-image: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.2) 0%, transparent 65%);
             color: #ffffff;
             margin: 0;
             padding: 0;
@@ -48,14 +49,14 @@
         .hud-header {
             width: 100%;
             max-width: 440px;
-            padding: 12px 16px;
+            padding: 12px 18px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: var(--card-bg);
             border-bottom: 1.5px solid var(--primary-cyan);
             border-radius: 0 0 16px 16px;
-            box-shadow: 0 4px 20px rgba(0, 229, 255, 0.2);
+            box-shadow: 0 4px 25px rgba(0, 229, 255, 0.25);
             z-index: 10;
         }
 
@@ -74,7 +75,7 @@
         }
 
         .hud-val {
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             font-weight: 900;
             color: #ffffff;
             font-family: monospace;
@@ -107,8 +108,8 @@
             aspect-ratio: 1 / 1;
             background: rgba(8, 13, 26, 0.95);
             border: 2px solid var(--primary-cyan);
-            border-radius: 16px;
-            box-shadow: 0 0 25px rgba(0, 229, 255, 0.25);
+            border-radius: 18px;
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.3);
             touch-action: none;
         }
 
@@ -116,31 +117,46 @@
         .dock-container {
             width: 100%;
             max-width: 440px;
-            padding: 12px;
+            padding: 14px;
             display: flex;
             justify-content: space-around;
             align-items: center;
             background: var(--card-bg);
             border-top: 1.5px solid var(--card-border);
-            border-radius: 16px 16px 0 0;
+            border-radius: 20px 20px 0 0;
+            gap: 10px;
         }
 
         .dock-slot {
             width: 100px;
             height: 100px;
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.85);
             border: 1px solid var(--card-border);
-            border-radius: 12px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
             position: relative;
+        }
+
+        .dock-slot canvas {
+            max-width: 80px;
+            max-height: 80px;
+        }
+
+        /* Dragged Floating Canvas Overlay */
+        #drag-canvas {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
         }
 
         /* Mobile Safari Install Hint Banner */
         .ios-hint {
             position: fixed;
-            bottom: 120px;
+            bottom: 125px;
             background: rgba(13, 21, 38, 0.95);
             border: 1px solid var(--accent-gold);
             border-radius: 12px;
@@ -174,16 +190,19 @@
         <canvas id="game-board" width="400" height="400"></canvas>
     </div>
 
-    <!-- iOS Add To Home Screen Hint -->
+    <!-- iPhone PWA Hint -->
     <div class="ios-hint" id="pwa-hint">
         💡 <strong>iPhone Tip:</strong> Tap Share ⎋ → <strong>"Add to Home Screen"</strong> to play in full screen!
     </div>
 
+    <!-- Floating Drag Canvas -->
+    <canvas id="drag-canvas"></canvas>
+
     <!-- Dock Tray Slots -->
     <div class="dock-container">
-        <div class="dock-slot" id="dock-0"></div>
-        <div class="dock-slot" id="dock-1"></div>
-        <div class="dock-slot" id="dock-2"></div>
+        <div class="dock-slot" id="slot-0"></div>
+        <div class="dock-slot" id="slot-1"></div>
+        <div class="dock-slot" id="slot-2"></div>
     </div>
 
     <script>
@@ -198,48 +217,113 @@
         // Web Audio Synthesizer SFX
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSfx(freq = 440, duration = 0.1) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
         }
 
-        // 8x8 Grid Engine
+        // Grid Engine Configuration
         const GRID_SIZE = 8;
         const grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
         let score = 0;
         let combo = 1;
 
-        const canvas = document.getElementById('game-board');
-        const ctx = canvas.getContext('2d');
-        const CELL_SIZE = canvas.width / GRID_SIZE;
+        const mainCanvas = document.getElementById('game-board');
+        const ctx = mainCanvas.getContext('2d');
+        const CELL_SIZE = mainCanvas.width / GRID_SIZE;
 
-        // Block Skins Colors
+        const dragCanvas = document.getElementById('drag-canvas');
+        const dragCtx = dragCanvas.getContext('2d');
+
+        // Color Palette
         const COLORS = [
             'transparent',
-            '#00E5FF', // Cyan
-            '#FFB300', // Gold
-            '#D500F9', // Magenta
-            '#00E676', // Green
-            '#FF1744'  // Red
+            '#00E5FF', // 1: Cyan
+            '#FFB300', // 2: Gold
+            '#D500F9', // 3: Magenta
+            '#00E676', // 4: Green
+            '#FF1744'  // 5: Red
         ];
 
-        function drawBoard() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Block Catalog
+        const SHAPES = [
+            { shape: [[1]], color: 1 },
+            { shape: [[1, 1]], color: 1 },
+            { shape: [[1], [1]], color: 2 },
+            { shape: [[1, 1, 1]], color: 2 },
+            { shape: [[1], [1], [1]], color: 3 },
+            { shape: [[1, 1], [1, 1]], color: 3 },
+            { shape: [[1, 1, 1], [0, 1, 0]], color: 4 },
+            { shape: [[1, 0], [1, 0], [1, 1]], color: 4 },
+            { shape: [[1, 1, 1, 1]], color: 5 }
+        ];
+
+        let dockTray = [null, null, null];
+        let draggingSlotIndex = -1;
+        let dragOffset = { x: 0, y: 0 };
+
+        function spawnTray() {
+            for (let i = 0; i < 3; i++) {
+                const randomShape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+                dockTray[i] = JSON.parse(JSON.stringify(randomShape));
+            }
+            renderDock();
+        }
+
+        function renderDock() {
+            for (let i = 0; i < 3; i++) {
+                valSlot = document.getElementById(`slot-${i}`);
+                valSlot.innerHTML = '';
+
+                if (dockTray[i]) {
+                    const canvasSlot = document.createElement('canvas');
+                    canvasSlot.width = 80;
+                    canvasSlot.height = 80;
+                    const slotCtx = canvasSlot.getContext('2d');
+
+                    const shape = dockTray[i].shape;
+                    const rows = shape.length;
+                    const cols = shape[0].length;
+                    const cellSize = Math.min(60 / cols, 60 / rows);
+                    const offsetX = (80 - cols * cellSize) / 2;
+                    const offsetY = (80 - rows * cellSize) / 2;
+
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            if (shape[r][c] === 1) {
+                                slotCtx.fillStyle = COLORS[dockTray[i].color];
+                                slotCtx.beginPath();
+                                slotCtx.roundRect(offsetX + c * cellSize, offsetY + r * cellSize, cellSize - 2, cellSize - 2, 4);
+                                slotCtx.fill();
+                            }
+                        }
+                    }
+
+                    valSlot.appendChild(canvasSlot);
+                }
+            }
+        }
+
+        function drawBoard(previewCoord = null, previewShape = null) {
+            ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+
             for (let r = 0; r < GRID_SIZE; r++) {
                 for (let c = 0; c < GRID_SIZE; c++) {
                     const x = c * CELL_SIZE;
                     const y = r * CELL_SIZE;
 
-                    // Cell Outline
                     ctx.strokeStyle = 'rgba(30, 45, 74, 0.6)';
+                    ctx.lineWidth = 1;
                     ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
 
                     if (grid[r][c] > 0) {
@@ -248,14 +332,197 @@
                         ctx.roundRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4, 6);
                         ctx.fill();
                         ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1;
+                        ctx.lineWidth = 1.5;
                         ctx.stroke();
+                    }
+                }
+            }
+
+            // Draw Drag Preview Ghost
+            if (previewCoord && previewShape) {
+                const { gr, gc } = previewCoord;
+                const rows = previewShape.shape.length;
+                const cols = previewShape.shape[0].length;
+
+                if (canPlace(gr, gc, previewShape.shape)) {
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            if (previewShape.shape[r][c] === 1) {
+                                const x = (gc + c) * CELL_SIZE;
+                                const y = (gr + r) * CELL_SIZE;
+                                ctx.fillStyle = 'rgba(0, 229, 255, 0.4)';
+                                ctx.beginPath();
+                                ctx.roundRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4, 6);
+                                ctx.fill();
+                            }
+                        }
                     }
                 }
             }
         }
 
-        drawBoard();
+        function canPlace(startRow, startCol, shape) {
+            const rows = shape.length;
+            const cols = shape[0].length;
+
+            if (startRow < 0 || startCol < 0 || startRow + rows > GRID_SIZE || startCol + cols > GRID_SIZE) {
+                return false;
+            }
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (shape[r][c] === 1 && grid[startRow + r][startCol + c] > 0) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placePiece(startRow, startCol, shapeObj) {
+            const shape = shapeObj.shape;
+            const rows = shape.length;
+            const cols = shape[0].length;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (shape[r][c] === 1) {
+                        grid[startRow + r][startCol + c] = shapeObj.color;
+                    }
+                }
+            }
+
+            playSfx(580, 0.08);
+            checkLineClears();
+        }
+
+        function checkLineClears() {
+            const clearedRows = [];
+            const clearedCols = [];
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                if (grid[r].every(val => val > 0)) clearedRows.push(r);
+            }
+
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let full = true;
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    if (grid[r][c] === 0) full = false;
+                }
+                if (full) clearedCols.push(c);
+            }
+
+            const totalClears = clearedRows.length + clearedCols.length;
+            if (totalClears > 0) {
+                clearedRows.forEach(r => grid[r].fill(0));
+                clearedCols.forEach(c => {
+                    for (let r = 0; r < GRID_SIZE; r++) grid[r][c] = 0;
+                });
+
+                combo++;
+                score += totalClears * 100 * combo;
+                playSfx(880, 0.2);
+            } else {
+                combo = 1;
+                score += 10;
+            }
+
+            document.getElementById('score-val').textContent = score;
+            document.getElementById('combo-val').textContent = `x${combo}`;
+            drawBoard();
+        }
+
+        // Drag and Drop Touch Events
+        function setupInteraction() {
+            for (let i = 0; i < 3; i++) {
+                const slot = document.getElementById(`slot-${i}`);
+
+                const startDrag = (e) => {
+                    if (!dockTray[i]) return;
+                    draggingSlotIndex = i;
+                    playSfx(400, 0.05);
+
+                    const touch = e.touches ? e.touches[0] : e;
+                    const shape = dockTray[i].shape;
+                    const rows = shape.length;
+                    const cols = shape[0].length;
+
+                    dragCanvas.width = cols * CELL_SIZE;
+                    dragCanvas.height = rows * CELL_SIZE;
+
+                    dragCtx.clearRect(0, 0, dragCanvas.width, dragCanvas.height);
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            if (shape[r][c] === 1) {
+                                dragCtx.fillStyle = COLORS[dockTray[i].color];
+                                dragCtx.beginPath();
+                                dragCtx.roundRect(c * CELL_SIZE + 2, r * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4, 6);
+                                dragCtx.fill();
+                            }
+                        }
+                    }
+
+                    dragCanvas.style.display = 'block';
+                    moveDrag(e);
+                };
+
+                slot.addEventListener('touchstart', startDrag);
+                slot.addEventListener('mousedown', startDrag);
+            }
+
+            const moveDrag = (e) => {
+                if (draggingSlotIndex === -1) return;
+                const touch = e.touches ? e.touches[0] : e;
+
+                dragCanvas.style.left = `${touch.clientX - dragCanvas.width / 2}px`;
+                dragCanvas.style.top = `${touch.clientY - dragCanvas.height - 20}px`;
+
+                const rect = mainCanvas.getBoundingClientRect();
+                const mx = touch.clientX - rect.left;
+                const my = (touch.clientY - 20) - rect.top;
+
+                const gc = Math.floor(mx / (rect.width / GRID_SIZE));
+                const gr = Math.floor(my / (rect.height / GRID_SIZE));
+
+                drawBoard({ gr, gc }, dockTray[draggingSlotIndex]);
+            };
+
+            const endDrag = (e) => {
+                if (draggingSlotIndex === -1) return;
+
+                const rect = mainCanvas.getBoundingClientRect();
+                const touch = e.changedTouches ? e.changedTouches[0] : e;
+                const mx = touch.clientX - rect.left;
+                const my = (touch.clientY - 20) - rect.top;
+
+                const gc = Math.floor(mx / (rect.width / GRID_SIZE));
+                const gr = Math.floor(my / (rect.height / GRID_SIZE));
+
+                const piece = dockTray[draggingSlotIndex];
+
+                if (canPlace(gr, gc, piece.shape)) {
+                    placePiece(gr, gc, piece);
+                    dockTray[draggingSlotIndex] = null;
+                    renderDock();
+
+                    if (dockTray.every(p => p === null)) {
+                        spawnTray();
+                    }
+                }
+
+                draggingSlotIndex = -1;
+                dragCanvas.style.display = 'none';
+                drawBoard();
+            };
+
+            window.addEventListener('touchmove', moveDrag);
+            window.addEventListener('mousemove', moveDrag);
+            window.addEventListener('touchend', endDrag);
+            window.addEventListener('mouseup', endDrag);
+        }
+
+        spawnTray();
+        setupInteraction();
     </script>
 </body>
 </html>
