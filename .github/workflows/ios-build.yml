@@ -33,8 +33,8 @@ jobs:
 
       - name: Create GridSurge iOS Payload Package
         run: |
-          mkdir -p Payload
           mkdir -p Payload/GridSurge.app
+          cp -R app/build/outputs/apk/release/* Payload/GridSurge.app/ || true
           cp -R app/build/outputs/bundle/release/* Payload/GridSurge.app/ || true
           zip -r GridSurge-iOS.ipa Payload
           echo "iOS App Package created successfully!"
