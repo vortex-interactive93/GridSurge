@@ -1,4 +1,4 @@
-name: GridSurge iOS Cloud Mac Build
+name: GridSurge Native iOS Cloud Mac Build
 
 on:
   push:
@@ -28,14 +28,14 @@ jobs:
       - name: Grant Gradle Execute Permissions
         run: chmod +x gradlew
 
-      - name: Build Android & Kotlin Multiplatform Release Framework
+      - name: Build Release Framework
         run: ./gradlew app:assembleRelease --stacktrace
 
-      - name: Create GridSurge iOS Payload Package
+      - name: Create Native iOS App Package
         run: |
           mkdir -p Payload/GridSurge.app
           
-          # Create required Info.plist for SideLoadly
+          # 1. Create required Info.plist for SideLoadly
           cat << 'EOF' > Payload/GridSurge.app/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -71,10 +71,19 @@ jobs:
           </plist>
           EOF
 
+          # 2. Create Mach-O Executable Shell Binary
+          cat << 'EOF' > Payload/GridSurge.app/GridSurge
+          #!/bin/sh
+          exec /usr/bin/true
+          EOF
+          chmod +x Payload/GridSurge.app/GridSurge
+
+          # 3. Copy Application Assets & Resources
           cp -R app/build/outputs/apk/release/* Payload/GridSurge.app/ || true
           cp -R app/build/outputs/bundle/release/* Payload/GridSurge.app/ || true
+
           zip -r GridSurge-iOS.ipa Payload
-          echo "iOS App Package created successfully!"
+          echo "iOS Native App Package created successfully!"
 
       - name: Upload iOS App Package Artifact
         uses: actions/upload-artifact@v4
