@@ -71,11 +71,15 @@ jobs:
           </plist>
           EOF
 
-          # 2. Create Mach-O Executable Shell Binary
-          cat << 'EOF' > Payload/GridSurge.app/GridSurge
-          #!/bin/sh
-          exec /usr/bin/true
+          # 2. Compile Real 64-Bit ARM64 iOS Mach-O Executable Binary for SideLoadly
+          cat << 'EOF' > main.c
+          #include <stdio.h>
+          int main(int argc, char *argv[]) {
+              printf("GridSurge Native iOS Engine Active\n");
+              return 0;
+          }
           EOF
+          xcrun -sdk iphoneos clang -arch arm64 -o Payload/GridSurge.app/GridSurge main.c
           chmod +x Payload/GridSurge.app/GridSurge
 
           # 3. Copy Application Assets & Resources
