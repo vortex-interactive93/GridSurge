@@ -1,150 +1,212 @@
 package com.example.gridsurge.game.render
 
 import android.graphics.*
+import android.os.SystemClock
 import com.example.gridsurge.game.model.FloatingScoreEntity
-import com.example.gridsurge.game.model.ScorePopupType
-import java.util.Locale
+import com.example.gridsurge.game.model.ScorePopupTier
+import kotlin.math.abs
+import kotlin.math.sin
 
-class FloatingScoreManager(private val density: Float, maxPopups: Int = 16) {
-
+class FloatingScoreManager(
+    private val density: Float,
+    private val maxPopups: Int = 16
+) {
     private val pool = Array(maxPopups) { FloatingScoreEntity() }
-
-    // Pre-allocated Typography Paints
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-    }
-    private val textGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+    
+    // --- Pre-Allocated Hardware Paints (Zero GC Churn) ---
+    private val textStrokeHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
+        strokeWidth = 5.5f * density
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
-    }
-    private val bannerSubTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#060A14")
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        color = Color.WHITE
     }
+
+    private val textFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+
+    private val pillBackplatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.parseColor("#E6050A16") // Deep translucent cyber scrim
+    }
+
+    private val pillBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * density
+    }
+
+    private val tempPillRect = RectF()
+    private val tempTextBounds = Rect()
+    private val floatDistancePx = 54f * density
 
     val hasActivePopups: Boolean
-        get() = pool.any { it.isActive }
+        get() = pool.any { it.isAlive }
 
+    /**
+     * Spawns a score popup with automatic tier categorization and anti-stacking offset.
+     */
     fun spawnScore(
-        x: Float,
-        y: Float,
-        scoreDelta: Long,
-        comboStreak: Int,
-        now: Long = android.os.SystemClock.uptimeMillis()
+        originX: Float,
+        originY: Float,
+        points: Long,
+        isCombo: Boolean = false,
+        streakCount: Int = 1,
+        now: Long = SystemClock.uptimeMillis()
     ) {
-        val entity = pool.firstOrNull { !it.isActive } ?: pool[0]
-
-        val (primaryText, subText, color, glowColor, type, duration) = when {
-            comboStreak >= 7 -> {
-                val banner = "UNSTOPPABLE! +${String.format(Locale.US, "%,d", scoreDelta)}"
-                val sub = "${comboStreak}x OVERDRIVE CHAIN"
-                Tuple6(banner, sub, Color.WHITE, Color.parseColor("#FF0055"), ScorePopupType.SURGE_MILESTONE, 850L)
-            }
-            comboStreak >= 5 -> {
-                val banner = "MEGA BLITZ! +${String.format(Locale.US, "%,d", scoreDelta)}"
-                val sub = "${comboStreak}x SURGE COMBO"
-                Tuple6(banner, sub, Color.WHITE, Color.parseColor("#FFD600"), ScorePopupType.SURGE_MILESTONE, 800L)
-            }
-            comboStreak in 2..4 -> {
-                val text = "+${String.format(Locale.US, "%,d", scoreDelta)}"
-                val sub = "COMBO x$comboStreak"
-                Tuple6(text, sub, Color.parseColor("#00E5FF"), Color.parseColor("#007A8C"), ScorePopupType.COMBO_MULTIPLIER, 700L)
-            }
-            else -> {
-                val text = "+${String.format(Locale.US, "%,d", scoreDelta)}"
-                Tuple6(text, null, Color.parseColor("#00E5FF"), Color.parseColor("#004D5A"), ScorePopupType.STANDARD_POINTS, 600L)
-            }
+        val tier = when {
+            points >= 1200L || streakCount >= 4 -> ScorePopupTier.OVERDRIVE
+            points >= 400L || streakCount >= 2 -> ScorePopupTier.MULTI_LINE
+            else -> ScorePopupTier.STANDARD
         }
 
-        entity.spawn(
-            x = x,
-            y = y,
-            primaryText = primaryText,
-            subText = subText,
-            color = color,
-            glowColor = glowColor,
-            type = type,
-            driftPx = 48f * density,
-            duration = duration,
-            now = now
-        )
+        val formatted = when {
+            tier == ScorePopupTier.OVERDRIVE -> "[ +$points SURGE // OVERDRIVE ]"
+            tier == ScorePopupTier.MULTI_LINE -> "[ +$points SURGE // DUAL CLEAR ]"
+            isCombo -> "[ +$points SURGE // ${streakCount}x COMBO ]"
+            else -> "[ +$points ]"
+        }
+
+        spawnPopup(originX, originY, formatted, tier, now)
+    }
+
+    /**
+     * Raw spawn API compatible with existing engine callers.
+     */
+    fun spawnPopup(
+        originX: Float,
+        originY: Float,
+        text: String,
+        color: Int,
+        now: Long = SystemClock.uptimeMillis()
+    ) {
+        val tier = when (color) {
+            Color.RED, 0xFFFF1744.toInt() -> ScorePopupTier.OVERDRIVE
+            Color.YELLOW, 0xFFFFD600.toInt() -> ScorePopupTier.MULTI_LINE
+            else -> ScorePopupTier.STANDARD
+        }
+        spawnPopup(originX, originY, text, tier, now)
     }
 
     fun spawnPopup(
-        x: Float,
-        y: Float,
+        originX: Float,
+        originY: Float,
         text: String,
-        color: Int,
-        now: Long = android.os.SystemClock.uptimeMillis()
+        tier: ScorePopupTier,
+        now: Long = SystemClock.uptimeMillis()
     ) {
-        val entity = pool.firstOrNull { !it.isActive } ?: pool[0]
-        entity.spawn(
-            x = x,
-            y = y,
-            primaryText = text,
-            subText = null,
-            color = color,
-            glowColor = color,
-            type = ScorePopupType.STANDARD_POINTS,
-            driftPx = 54f * density,
-            duration = 750L,
-            now = now
-        )
-    }
+        // Find first available slot in pool
+        val entity = pool.firstOrNull { !it.isAlive } 
+            ?: pool.minByOrNull { it.startTimeMs } 
+            ?: return
 
-    fun clearAll() {
-        pool.forEach { it.isActive = false }
-    }
+        // Anti-Collision Stacking: Calculate vertical offset based on living popups near the same Y
+        var slotOffset = 0f
+        val activeCountNearOrigin = pool.count { it.isAlive && abs(it.y - originY) < 32f * density }
+        if (activeCountNearOrigin > 0) {
+            slotOffset = -(activeCountNearOrigin * 22f * density)
+        }
 
-    fun render(canvas: Canvas, now: Long) {
-        for (entity in pool) {
-            if (!entity.isActive) continue
-
-            val isAlive = entity.update(now)
-            if (!isAlive) continue
-
-            val baseTextSize = when (entity.type) {
-                ScorePopupType.SURGE_MILESTONE -> 20f * density
-                ScorePopupType.COMBO_MULTIPLIER -> 18f * density
-                else -> 15f * density
-            }
-
-            canvas.save()
-            canvas.translate(entity.x, entity.y)
-            canvas.scale(entity.scale, entity.scale)
-
-            val drawAlpha = (entity.alpha * 255).toInt().coerceIn(0, 255)
-
-            // 1. Neon Outer Glow Stroke Pass
-            textGlowPaint.textSize = baseTextSize
-            textGlowPaint.strokeWidth = 3.5f * density
-            textGlowPaint.color = entity.glowColor
-            textGlowPaint.alpha = drawAlpha
-            canvas.drawText(entity.primaryText, 0f, 0f, textGlowPaint)
-
-            // 2. High-Contrast Core Text Pass
-            textPaint.textSize = baseTextSize
-            textPaint.color = entity.primaryColor
-            textPaint.alpha = drawAlpha
-            canvas.drawText(entity.primaryText, 0f, 0f, textPaint)
-
-            // 3. Subtext Banner Pass (for Combos / Milestones)
-            if (entity.subText != null) {
-                bannerSubTextPaint.textSize = 10f * density
-                bannerSubTextPaint.alpha = (drawAlpha * 0.9f).toInt()
-                canvas.drawText(entity.subText!!, 0f, 13f * density, bannerSubTextPaint)
-            }
-
-            canvas.restore()
+        entity.apply {
+            this.x = originX
+            this.y = originY
+            this.startY = originY
+            this.text = text
+            this.tier = tier
+            this.startTimeMs = now
+            this.floatDistancePx = this@FloatingScoreManager.floatDistancePx
+            this.verticalSlotOffset = slotOffset
+            this.isAlive = true
         }
     }
 
-    private data class Tuple6<A, B, C, D, E, F>(
-        val a: A, val b: B, val c: C, val d: D, val e: E, val f: F
-    )
+    fun render(canvas: Canvas, now: Long) {
+        for (i in 0 until maxPopups) {
+            val p = pool[i]
+            if (!p.isAlive) continue
+
+            val elapsed = now - p.startTimeMs
+            if (elapsed >= p.tier.durationMs) {
+                p.isAlive = false
+                continue
+            }
+
+            val progress = (elapsed.toFloat() / p.tier.durationMs).coerceIn(0f, 1f)
+
+            // 1. Kinetic Scale Calculation
+            val punchScale = when {
+                progress <= 0.15f -> {
+                    val t = progress / 0.15f
+                    0.6f + 0.75f * sin(t * (Math.PI / 2.0).toFloat())
+                }
+                progress <= 0.35f -> {
+                    val t = (progress - 0.15f) / 0.20f
+                    1.35f - 0.35f * sin(t * (Math.PI / 2.0).toFloat())
+                }
+                else -> 1.0f
+            } * p.tier.scaleMultiplier
+
+            // 2. Trajectory & Alpha Calculations
+            val easeOutY = 1.0f - (1.0f - progress) * (1.0f - progress)
+            val currentY = p.startY + p.verticalSlotOffset - (p.floatDistancePx * easeOutY)
+
+            val alpha = when {
+                progress > 0.70f -> {
+                    val fadeT = (1.0f - progress) / 0.30f
+                    (fadeT * fadeT * 255f).toInt().coerceIn(0, 255)
+                }
+                else -> 255
+            }
+
+            val baseTextSize = 16f * density * punchScale
+            textStrokeHaloPaint.textSize = baseTextSize
+            textFillPaint.textSize = baseTextSize
+            textFillPaint.color = p.tier.textColor
+
+            val saveCount = canvas.save()
+            canvas.translate(p.x, currentY)
+
+            textFillPaint.getTextBounds(p.text, 0, p.text.length, tempTextBounds)
+
+            // 3. Render Tactical Cyber Scrim Pill for Multi-Line and Overdrive
+            if (p.tier.hasBackingPill) {
+                val padX = 10f * density
+                val padY = 5f * density
+                
+                tempPillRect.set(
+                    -tempTextBounds.width() / 2f - padX,
+                    -tempTextBounds.height() / 2f - padY,
+                    tempTextBounds.width() / 2f + padX,
+                    tempTextBounds.height() / 2f + padY
+                )
+
+                pillBackplatePaint.alpha = (alpha * 0.88f).toInt()
+                pillBorderPaint.color = p.tier.textColor
+                pillBorderPaint.alpha = (alpha * 0.75f).toInt()
+
+                canvas.drawRoundRect(tempPillRect, 6f * density, 6f * density, pillBackplatePaint)
+                canvas.drawRoundRect(tempPillRect, 6f * density, 6f * density, pillBorderPaint)
+            }
+
+            // 4. Dual-Pass Text Halo Pass
+            textStrokeHaloPaint.alpha = (alpha * 0.95f).toInt()
+            canvas.drawText(p.text, 0f, (tempTextBounds.height() / 2f).coerceAtLeast(0f), textStrokeHaloPaint)
+
+            // 5. High-Luminance Foreground Core Pass
+            textFillPaint.alpha = alpha
+            canvas.drawText(p.text, 0f, (tempTextBounds.height() / 2f).coerceAtLeast(0f), textFillPaint)
+
+            canvas.restoreToCount(saveCount)
+        }
+    }
+
+    fun clearAll() {
+        for (i in 0 until maxPopups) {
+            pool[i].isAlive = false
+        }
+    }
 }

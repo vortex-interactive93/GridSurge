@@ -91,7 +91,7 @@ class InteractionHandler(
                     velocityY = 0f
                     
                     updateDragPosition(x, y)
-                    SfxManager.playSfx(SfxType.TILE_PICKUP)
+                    SfxManager.playTilePickup()
                     listener.requestInvalidate()
                     return true
                 }
@@ -252,7 +252,7 @@ class InteractionHandler(
         velocityX = 0f
         velocityY = 0f
         updateDragPosition(touchX, touchY)
-        SfxManager.playSfx(SfxType.TILE_PICKUP)
+        SfxManager.playTilePickup()
         listener.requestInvalidate()
     }
 

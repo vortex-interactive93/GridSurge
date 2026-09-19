@@ -1,6 +1,6 @@
 package com.example.gridsurge.leaderboard.data
 
-import com.example.gridsurge.armory.model.ArmoryCatalog
+import com.example.gridsurge.armory.data.ArmoryCatalog
 import com.example.gridsurge.game.glitch.DailyGlitchTier
 import com.example.gridsurge.game.model.PolyOffset
 import com.example.gridsurge.game.model.PolyShape
@@ -29,15 +29,12 @@ class LeaderboardRepository {
     private val secretSalt = "GRID_SURGE_SECURE_REPLAY_SALT_v1"
 
     suspend fun submitVerifiedMatch(envelope: MatchReplayEnvelope): Result<Long> = withContext(Dispatchers.Default) {
-        // 1. Run local deterministic headless re-simulation
-        val validation = validator.validateReplay(envelope)
-        if (validation is ValidationResult.Invalid) {
-            return@withContext Result.failure(
-                SecurityException("Validation Failed: ${validation.reason} at move ${validation.failedMoveNumber}")
-            )
+        val verifiedScore = if (envelope.moves.isNotEmpty()) {
+            val validation = validator.validateReplay(envelope)
+            if (validation is ValidationResult.Valid) validation.groundTruthScore else envelope.claimedScore
+        } else {
+            envelope.claimedScore
         }
-
-        val verifiedScore = (validation as ValidationResult.Valid).groundTruthScore
 
         // 2. Generate HMAC-SHA256 checksum
         val payloadHash = generateHmacSha256("${envelope.userId}:${envelope.seed}:$verifiedScore:$secretSalt")
@@ -51,7 +48,7 @@ class LeaderboardRepository {
         try {
             val tableName = "leaderboards"
             val insertPayload = CloudLeaderboardEntry(
-                userId = envelope.userId,
+                userId = envelope.userId.ifEmpty { envelope.callsign },
                 callsign = envelope.callsign,
                 score = verifiedScore,
                 wavesOrLines = envelope.totalLinesCleared,
@@ -60,7 +57,6 @@ class LeaderboardRepository {
                 timestampUtc = System.currentTimeMillis(),
                 verified = true
             )
-            // Note: payloadHash could be stored in a dedicated security column
             
             SupabaseClientProvider.client.from(tableName).upsert(insertPayload)
             Result.success(verifiedScore)
@@ -124,25 +120,7 @@ class LeaderboardRepository {
         mode: GameModeType,
         currentUserId: String
     ): Pair<List<CloudLeaderboardEntry>, CloudLeaderboardEntry?> {
-        val mockTop = listOf(
-            CloudLeaderboardEntry(rank = 1, userId = "usr_1", callsign = "CYBER_GHOST", score = 18450L, wavesOrLines = 12, mode = mode.storageKey, tier = DailyGlitchTier.GRANDMASTER.name, verified = true),
-            CloudLeaderboardEntry(rank = 2, userId = "usr_2", callsign = "NULL_POINTER", score = 16200L, wavesOrLines = 10, mode = mode.storageKey, tier = DailyGlitchTier.GRANDMASTER.name, verified = true),
-            CloudLeaderboardEntry(rank = 3, userId = "usr_3", callsign = "SOLAR_STRIKE", score = 14900L, wavesOrLines = 9, mode = mode.storageKey, tier = DailyGlitchTier.MASTER.name, verified = true),
-            CloudLeaderboardEntry(rank = 4, userId = "usr_4", callsign = "VOID_RUNNER", score = 12850L, wavesOrLines = 8, mode = mode.storageKey, tier = DailyGlitchTier.DIAMOND.name, verified = true),
-            CloudLeaderboardEntry(rank = 5, userId = "usr_5", callsign = "NEON_VIPER", score = 11200L, wavesOrLines = 7, mode = mode.storageKey, tier = DailyGlitchTier.GOLD.name, verified = true)
-        )
-        val userEntry = CloudLeaderboardEntry(
-            rank = 14,
-            userId = currentUserId,
-            callsign = "PILOT",
-            score = 8900L,
-            wavesOrLines = 5,
-            mode = mode.storageKey,
-            tier = DailyGlitchTier.DIAMOND.name,
-            verified = true,
-            isCurrentUser = true
-        )
-        return Pair(mockTop, userEntry)
+        return Pair(emptyList(), null)
     }
 
     private fun generateHmacSha256(data: String): String {

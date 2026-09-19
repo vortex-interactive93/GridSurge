@@ -27,6 +27,7 @@ data class DailyGlitchUiState(
     val timeRemainingMillis: Long,
     val formattedTimeRemaining: String,
     val hasTicketAvailable: Boolean,
+    val hasExtraRetryAvailable: Boolean = false,
     val userPersonalBestScore: Long,
     val userPersonalBestWaves: Int,
     val userRank: Int?,

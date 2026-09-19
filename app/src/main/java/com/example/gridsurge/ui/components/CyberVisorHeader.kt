@@ -8,6 +8,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,8 +37,12 @@ import com.example.gridsurge.features.adventure.model.NeuralAugment
 import com.example.gridsurge.features.adventure.model.ObjectiveType
 import com.example.gridsurge.features.adventure.model.RelicCyberWareState
 import com.example.gridsurge.features.adventure.ui.components.ActiveRelicButton
+import com.example.gridsurge.game.glitch.model.DailySeedMetadata
+import com.example.gridsurge.game.glitch.model.GlitchVisorTelemetry
+import com.example.gridsurge.game.glitch.model.GlitchVisorUiState
 import com.example.gridsurge.ui.CyberChamferShape
 import com.example.gridsurge.ui.CyberChamferShape
+import com.example.gridsurge.ui.glitch.components.TacticalGlitchVisor
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -69,6 +76,9 @@ fun AdaptiveCyberVisorHeader(
     isWarpReady: Boolean = false,
     boardOccupancy: Float = 0f,
     activeAugments: List<NeuralAugment> = emptyList(),
+    targetScore3Star: Long = 0L,
+    timeLimit3Star: Int = 0,
+    purityIntegrity: Float = 1.0f,
     relicState: RelicCyberWareState? = null,
     onRelicActivate: () -> Unit = {},
     onRelicDragStart: (Float, Float) -> Unit = { _, _ -> },
@@ -79,6 +89,27 @@ fun AdaptiveCyberVisorHeader(
     isEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    if (gameMode == VisorGameMode.DAILY_GLITCH) {
+        val timerMm = (elapsedSeconds / 60).toString().padStart(2, '0')
+        val timerSs = (elapsedSeconds % 60).toString().padStart(2, '0')
+        val seedMeta = DailySeedMetadata.currentUtc()
+
+        TacticalGlitchVisor(
+            telemetry = GlitchVisorTelemetry(
+                score = score,
+                formattedTime = "$timerMm:$timerSs",
+                catalystsPurged = catalystsPurged,
+                targetPurgeQuota = totalCatalysts,
+                systemPurity = purityIntegrity,
+                seedDateKey = seedMeta.dateKey,
+                activeWave = (catalystsPurged / 5) + 1
+            ),
+            onPauseClick = onPauseClick,
+            modifier = modifier
+        )
+        return
+    }
+
     // 1. Determine Critical Time State (Time Blitz only)
     val isCriticalTime = (gameMode == VisorGameMode.TIME_BLITZ && timeRemainingSec in 0.1f..15.0f) ||
                          (gameMode == VisorGameMode.ADVENTURE && movesRemaining in 1..3)
@@ -293,6 +324,10 @@ fun AdaptiveCyberVisorHeader(
                     else -> Triple("", "", Color.White)
                 }
 
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     TelemetrySlot(
                         label = objLabel,
                         value = objValue,
@@ -300,6 +335,16 @@ fun AdaptiveCyberVisorHeader(
                         alignment = Alignment.CenterHorizontally,
                         modifier = Modifier.clickable { onPauseClick() }
                     )
+
+                    if (gameMode == VisorGameMode.ADVENTURE) {
+                        LiveMasteryTelemetryPill(
+                            currentScore = score,
+                            elapsedSeconds = elapsedSeconds,
+                            targetScoreStar3 = targetScore3Star,
+                            timeLimitStar3 = timeLimit3Star
+                        )
+                    }
+                }
 
                 // SLOT 4: TACTICAL PAUSE BUTTON
                 Box(
@@ -322,6 +367,13 @@ fun AdaptiveCyberVisorHeader(
                         Box(modifier = Modifier.width(3.dp).height(16.dp).background(Color.White, RoundedCornerShape(1.dp)))
                     }
                 }
+            }
+
+            if (gameMode == VisorGameMode.DAILY_GLITCH) {
+                SystemPurityBar(
+                    purity = purityIntegrity,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
     }
@@ -547,5 +599,109 @@ private fun TelemetrySlot(
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Black
         )
+    }
+}
+
+@Composable
+fun LiveMasteryTelemetryPill(
+    currentScore: Long,
+    elapsedSeconds: Int,
+    targetScoreStar3: Long,
+    timeLimitStar3: Int,
+    isMasteryFeatBroken: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val isTimeQualified = timeLimitStar3 <= 0 || elapsedSeconds <= timeLimitStar3
+    val isScoreQualified = targetScoreStar3 <= 0L || currentScore >= targetScoreStar3
+    val isStar3Viable = isTimeQualified && !isMasteryFeatBroken
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xCC090F1B))
+            .border(
+                1.dp,
+                if (isStar3Viable) Color(0xFFFFB300) else Color(0xFF1E2D44),
+                RoundedCornerShape(6.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Star 1: Objective
+        Icon(
+            imageVector = Icons.Default.Star,
+            contentDescription = null,
+            tint = Color(0xFFFFB300),
+            modifier = Modifier.size(11.dp)
+        )
+        // Star 2: Pace / Score
+        Icon(
+            imageVector = Icons.Default.Star,
+            contentDescription = null,
+            tint = if (isScoreQualified || isTimeQualified) Color(0xFFFFB300) else Color(0xFF33445C),
+            modifier = Modifier.size(11.dp)
+        )
+        // Star 3: Elite Mastery Feat
+        Icon(
+            imageVector = Icons.Default.Star,
+            contentDescription = null,
+            tint = if (isStar3Viable) Color(0xFFFF1744) else Color(0xFF33445C),
+            modifier = Modifier.size(11.dp)
+        )
+    }
+}
+
+@Composable
+fun SystemPurityBar(
+    purity: Float,
+    modifier: Modifier = Modifier
+) {
+    val purityPct = (purity * 100).toInt().coerceIn(0, 100)
+    val color = when {
+        purity >= 0.60f -> Color(0xFF00FF66)
+        purity >= 0.30f -> Color(0xFFFFD600)
+        else -> Color(0xFFFF0055)
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "SYSTEM PURITY",
+                color = Color(0xFF5C8599),
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "$purityPct%",
+                color = color,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Black
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(2.5.dp))
+                .background(Color(0xFF08101E))
+                .border(0.5.dp, Color(0xFF1A2A44), RoundedCornerShape(2.5.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(purity.coerceIn(0f, 1f))
+                    .background(color)
+            )
+        }
     }
 }

@@ -28,6 +28,7 @@ fun MatrixFailureReviveDialog(
     failureSubtitle: String? = null,
     isGlitchMode: Boolean = false,
     onDeployEmp: () -> Unit,
+    onWatchAdToRevive: () -> Unit = {},
     onReboot: () -> Unit,
     onAbort: () -> Unit
 ) {
@@ -111,8 +112,15 @@ fun MatrixFailureReviveDialog(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // REVIVE OPTION
+            // REVIVE OPTIONS
             if (canRevive && !isGlitchMode) {
+                TacticalButton(
+                    label = "WATCH AD // EMP REVIVE",
+                    color = Color(0xFFFFD600),
+                    onClick = onWatchAdToRevive
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
                 TacticalButton(
                     label = "DEPLOY EMP SURGE [50 ★]",
                     color = Color(0xFF00E5FF),

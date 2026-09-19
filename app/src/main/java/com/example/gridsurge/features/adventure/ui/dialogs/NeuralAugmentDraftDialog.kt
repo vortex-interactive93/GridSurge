@@ -90,7 +90,7 @@ fun NeuralAugmentDraftDialog(
                                 .background(Color(0xFF07111E))
                                 .border(1.2.dp, cardBorderColor.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
                                 .clickable {
-                                    SfxManager.playSfx(SfxType.OVERDRIVE_ACTIVATE)
+                                    SfxManager.playSfx(SfxType.AUGMENT_DRAFTED)
                                     onAugmentSelected(augment)
                                 }
                                 .padding(12.dp)

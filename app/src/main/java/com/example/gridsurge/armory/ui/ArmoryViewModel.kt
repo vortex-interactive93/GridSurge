@@ -3,7 +3,7 @@ package com.example.gridsurge.armory.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gridsurge.armory.ArmoryEngineBridge
-import com.example.gridsurge.armory.model.ArmoryCatalog
+import com.example.gridsurge.armory.data.ArmoryCatalog
 import com.example.gridsurge.armory.model.ArmoryCategory
 import com.example.gridsurge.armory.model.ArmoryItem
 import com.example.gridsurge.armory.model.ArmoryUiState
@@ -47,12 +47,12 @@ class ArmoryViewModel(
     }
 
     fun selectCategory(category: ArmoryCategory) {
-        if (_uiState.value.selectedCategory == category) return
+        if (_uiState.value.activeTab == category) return
         SfxManager.playSfx(SfxType.SNAP_TICK)
-        val defaultItem = getItemsForCategory(category).first()
+        val defaultItem = getItemsForCategory(category).firstOrNull() ?: return
         _uiState.update {
             it.copy(
-                selectedCategory = category,
+                activeTab = category,
                 selectedItem = defaultItem,
                 feedbackMessage = null
             )
@@ -64,7 +64,7 @@ class ArmoryViewModel(
         SfxManager.playSfx(SfxType.SNAP_TICK)
         _uiState.update { it.copy(selectedItem = item, feedbackMessage = null) }
 
-        if (item.category == ArmoryCategory.VOX_PACKS) {
+        if (item is ArmoryItem.VoxAnnouncerItem) {
             ArmoryEngineBridge.auditionVoxPack(item.themeKey)
         }
     }
@@ -73,10 +73,9 @@ class ArmoryViewModel(
         val state = _uiState.value
         val item = state.selectedItem
         val isUnlocked = state.userState.unlockedItemIds.contains(item.id)
-        val isEquipped = when (item.category) {
-            ArmoryCategory.BLOCK_SKINS -> state.userState.equippedBlockSkinId == item.id
-            ArmoryCategory.VOX_PACKS -> state.userState.equippedVoxPackId == item.id
-            else -> false
+        val isEquipped = when (item) {
+            is ArmoryItem.BlockSkinItem -> state.userState.equippedBlockSkinId == item.id
+            is ArmoryItem.VoxAnnouncerItem -> state.userState.equippedVoxPackId == item.id
         }
 
         if (isEquipped) return
@@ -105,8 +104,7 @@ class ArmoryViewModel(
     fun getItemsForCategory(category: ArmoryCategory): List<ArmoryItem> {
         return when (category) {
             ArmoryCategory.BLOCK_SKINS -> ArmoryCatalog.BLOCK_SKINS
-            ArmoryCategory.VOX_PACKS -> ArmoryCatalog.VOX_PACKS
-            ArmoryCategory.CHASSIS_FRAMES -> emptyList()
+            ArmoryCategory.VOX_COMMS -> ArmoryCatalog.VOX_COMMS
         }
     }
 }

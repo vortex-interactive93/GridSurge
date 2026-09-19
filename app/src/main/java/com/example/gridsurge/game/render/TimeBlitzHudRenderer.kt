@@ -1,7 +1,6 @@
 package com.example.gridsurge.game.render
 
 import android.graphics.*
-import com.example.gridsurge.game.blitz.BlitzState
 import com.example.gridsurge.game.blitz.TimeBlitzEngine
 import kotlin.math.sin
 import kotlin.random.Random
@@ -63,10 +62,10 @@ class TimeBlitzHudRenderer(private val density: Float) {
         timerBarBounds.set(gridBounds.left, hudTop, gridBounds.right, hudTop + (11f * density))
         feverBarBounds.set(gridBounds.left, timerBarBounds.bottom + (5f * density), gridBounds.right, timerBarBounds.bottom + (11f * density))
 
-        val isFever = (blitzEngine.state == BlitzState.FEVER_ACTIVE)
+        val isFever = blitzEngine.isFeverActive
         val timeSec = blitzEngine.secondsRemaining
         val timeRatio = (timeSec / blitzEngine.initialTimeSec).coerceIn(0f, 1f)
-        val isLowTime = timeSec <= 15f && blitzEngine.state == BlitzState.RUNNING
+        val isLowTime = timeSec <= 15f && !blitzEngine.isTimeExpired
 
         // 1. Draw Time Gauge
         canvas.drawRoundRect(timerBarBounds, 3f * density, 3f * density, gaugeTrackPaint)

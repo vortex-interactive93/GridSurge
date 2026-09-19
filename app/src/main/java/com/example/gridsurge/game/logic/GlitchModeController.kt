@@ -1,5 +1,7 @@
 package com.example.gridsurge.game.logic
 
+import com.example.gridsurge.audio.SfxManager
+import com.example.gridsurge.audio.SfxType
 import com.example.gridsurge.game.glitch.GlitchPieceSpawner
 import com.example.gridsurge.game.glitch.GlitchEngine
 import com.example.gridsurge.core.ClearResult
@@ -23,6 +25,11 @@ class GlitchModeController(
 
         if (turnResult.purgedCount > 0) {
             juice.triggerShake(0.5f)
+        }
+
+        if (turnResult.spreadEvents.isNotEmpty()) {
+            juice.triggerShake(0.65f)
+            SfxManager.playSfx(SfxType.EMP_SHOCKWAVE)
         }
 
         turnResult.spreadEvents.forEach { event ->

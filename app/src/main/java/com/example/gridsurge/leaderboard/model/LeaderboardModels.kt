@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 enum class GameModeType(val storageKey: String, val displayName: String) {
     DAILY_GLITCH("daily_glitch", "DAILY GLITCH"),
     TIME_BLITZ("time_blitz", "TIME BLITZ"),
+    BLITZ_CLASH("blitz_clash", "BLITZ CLASH"),
     CLASSIC_SURGE("classic_surge", "CLASSIC SURGE")
 }
 

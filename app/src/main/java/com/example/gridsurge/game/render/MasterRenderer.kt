@@ -7,7 +7,6 @@ import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withSave
 import com.example.gridsurge.features.adventure.model.*
 import com.example.gridsurge.features.adventure.rendering.*
-import com.example.gridsurge.game.blitz.BlitzState
 import com.example.gridsurge.game.blitz.TimeBlitzEngine
 import com.example.gridsurge.game.fx.*
 import com.example.gridsurge.game.glitch.GlitchEngine
@@ -17,11 +16,20 @@ import com.example.gridsurge.game.model.*
 import com.example.gridsurge.game.particle.CyberParticleSystem
 import com.example.gridsurge.core.ComboState
 import com.example.gridsurge.core.GridEngine
+import com.example.gridsurge.game.blitz.model.BlitzTerminalSequenceState
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
 import com.example.gridsurge.game.engine.SpecialBlockSolver
+import com.example.gridsurge.game.glitch.model.ActiveAnomalyNode
+import com.example.gridsurge.game.glitch.model.AnomalyCellPhase
+import com.example.gridsurge.game.glitch.model.AnomalyStage
+import com.example.gridsurge.game.glitch.model.CatalystStatus
+import com.example.gridsurge.game.glitch.model.GlitchCatalyst
+import com.example.gridsurge.game.glitch.model.StagedGlitchBlock
+import com.example.gridsurge.game.glitch.render.StagedAnomalyBitmapRenderer
+import java.util.Locale
 
 data class MilestoneBannerState(
     var text: String,
@@ -233,6 +241,14 @@ class MasterRenderer(
 
     val bossHudRenderer = BossHudRenderer(density)
     val blitzHudRenderer = TimeBlitzHudRenderer(density)
+    val criticalVignetteRenderer = CriticalVignetteRenderer(density)
+    val finaleRenderer = BlitzFinaleOverlayRenderer(density)
+    val exhaustRenderer = OverdriveExhaustRenderer(density)
+    val clashAttackEmitter = ClashAttackEmitterRenderer(density)
+    val syncPreloaderRenderer = GridSyncPreloaderRenderer(density)
+    val glitchFxRenderer = GlitchFxRenderer(density)
+    val anomalyDiodeRenderer = AnomalyDiodeRenderer(density)
+    val stagedAnomalyBitmapRenderer = StagedAnomalyBitmapRenderer(context, density)
 
     private val disabledSlotBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -302,7 +318,11 @@ class MasterRenderer(
         warpController: WarpBlockController,
         sectorId: Int = 1,
         now: Long,
-        dt: Float
+        dt: Float,
+        blitzTerminalSequenceState: BlitzTerminalSequenceState = BlitzTerminalSequenceState(),
+        activePreloaderElapsedMs: Long = 0L,
+        isRebootLockoutActive: Boolean = false,
+        rebootTimerSec: Float = 0f
     ) {
         if (boardRect.width() <= 0 || boardRect.height() <= 0 || cellSize <= 0) return
 
@@ -319,7 +339,7 @@ class MasterRenderer(
         }
 
         // --- LAYER 1: BACKGROUND ---
-        drawBackgroundSockets(canvas, engine, boardRect, cellSize, cellSpacing, dockSlotBounds, isBossVulnerable, sectorId, activeThemeKey, isAdventureModeActive)
+        drawBackgroundSockets(canvas, engine, boardRect, cellSize, cellSpacing, dockSlotBounds, isBossVulnerable, sectorId, activeThemeKey, isAdventureModeActive, isGlitchModeActive, isTimeBlitzModeActive, blitzEngine)
 
         // --- LAYER 2: GRID PROJECTIONS (Ghost, Holograms) ---
         if (dragState.isDragging && dragState.isValidPlacement) {
@@ -347,13 +367,13 @@ class MasterRenderer(
         juiceFx.renderCorruptionPulses(canvas)
 
         // --- LAYER 5: BLOCK OVERLAYS ---
-        drawHazards(canvas, boardRect, cellSize, cellSpacing, isAdventureModeActive, hazardGrid)
+        drawHazards(canvas, boardRect, cellSize, cellSpacing, hazardGrid, textureCache, now)
         renderBossCoreShield(canvas, boardRect, cellSize, cellSpacing, isCurrentStageBoss, bossBattleState, now)
 
         // --- LAYER 6: FLOATING UI & HAND ---
         scorePopupManager.render(canvas, now)
         drawComboIndicator(canvas, boardRect, comboStreak, comboState, graceMovesRemaining, maxGraceMoves, isClashModeActive, isTimeBlitzModeActive, now)
-        drawDock(canvas, dockSlotBounds, dockShapes, canPieceFit, dockCellSizePx, activeThemeKey, textureCache, now, dragState)
+        drawDock(canvas, dockSlotBounds, dockShapes, canPieceFit, dockCellSizePx, activeThemeKey, textureCache, now, dragState, isRebootLockoutActive, rebootTimerSec)
         drawDragPiece(canvas, dragState, boardRect, cellSize, cellSpacing, activeThemeKey, textureCache, now)
 
         if (trauma > 0f) {
@@ -366,6 +386,25 @@ class MasterRenderer(
         }
         if (isTimeBlitzModeActive) {
             blitzHudRenderer.renderBlitzHud(canvas, boardRect, blitzEngine, now)
+            criticalVignetteRenderer.updateDimensions(canvas.width.toFloat(), canvas.height.toFloat())
+            criticalVignetteRenderer.renderVignette(canvas, blitzEngine.secondsRemaining, now)
+            exhaustRenderer.updateAndRender(canvas, dt)
+            finaleRenderer.renderFinaleSequence(canvas, boardRect, blitzTerminalSequenceState)
+        }
+        if (isClashModeActive) {
+            clashAttackEmitter.updateAndRender(canvas, dt)
+        }
+        if (activePreloaderElapsedMs > 0L) {
+            syncPreloaderRenderer.drawPreAdNotice(canvas, boardRect, activePreloaderElapsedMs)
+        }
+        if (isGlitchModeActive) {
+            glitchFxRenderer.renderScreenGlitch(
+                canvas = canvas,
+                boardRect = boardRect,
+                purity = 1.0f - (glitchEngine.activeInfections.size / 12f).coerceIn(0f, 0.85f),
+                trauma = trauma,
+                now = now
+            )
         }
         if (juiceFx.isGlitchActive()) {
             juiceFx.renderGlitchOverlay(canvas, canvas.width.toFloat(), canvas.height.toFloat())
@@ -385,7 +424,10 @@ class MasterRenderer(
         isBossVulnerable: Boolean,
         sectorId: Int = 1,
         activeThemeKey: String = "",
-        isAdventureModeActive: Boolean = false
+        isAdventureModeActive: Boolean = false,
+        isGlitchModeActive: Boolean = false,
+        isTimeBlitzModeActive: Boolean = false,
+        blitzEngine: TimeBlitzEngine = TimeBlitzEngine()
     ) {
         // 1. Base Obsidian Backplate
         canvas.drawRoundRect(boardRect, 16f * density, 16f * density, scrimBackplatePaint)
@@ -418,6 +460,16 @@ class MasterRenderer(
         if (boardRect.width() > 0 && boardRect.height() > 0) {
             val (c1, c2, c3) = when {
                 isBossVulnerable -> Triple(Color.RED, Color.YELLOW, Color.RED)
+                isTimeBlitzModeActive && blitzEngine.isFeverActive -> Triple(
+                    0xFFFF1744.toInt(), // Solar Plasma Red
+                    0xFFFFD600.toInt(), // High-Voltage Gold
+                    0xFFFF9100.toInt()  // Radiant Amber
+                )
+                isGlitchModeActive -> Triple(
+                    0xFF00FF66.toInt(), // Bio-Hazard Emerald
+                    0xFFFFD600.toInt(), // Solar Hazard Amber
+                    0xFFFF0055.toInt()  // Meltdown Crimson
+                )
                 isAdventureModeActive && sectorId == 2 -> Triple(0xFFFFD600.toInt(), 0xFFFF6D00.toInt(), 0xFFFF1744.toInt()) // Sector 2: Solar Gold -> Molten Orange -> Crimson Red
                 isAdventureModeActive && sectorId == 3 -> Triple(0xFFFF1744.toInt(), 0xFFD500F9.toInt(), 0xFFEA80FC.toInt()) // Sector 3: Crimson -> Magenta -> Violet
                 isAdventureModeActive && sectorId == 4 -> Triple(0xFF00E676.toInt(), 0xFF00E5FF.toInt(), 0xFF00B0FF.toInt()) // Sector 4: Bio Emerald -> Lime -> Cyan
@@ -446,7 +498,11 @@ class MasterRenderer(
             gradientBorderGlowPaint.shader = borderShader
 
             // Outer Neon Glow
-            gradientBorderGlowPaint.alpha = if (isBossVulnerable) 180 else 110
+            gradientBorderGlowPaint.alpha = when {
+                isBossVulnerable -> 180
+                isTimeBlitzModeActive && blitzEngine.isFeverActive -> 210
+                else -> 110
+            }
             canvas.drawRoundRect(boardRect, 16f * density, 16f * density, gradientBorderGlowPaint)
 
             // Crisp Main Border
@@ -543,22 +599,17 @@ class MasterRenderer(
 
     private fun drawInfectedCell(canvas: Canvas, index: Int, glitchEngine: GlitchEngine, activeThemeKey: String, textureCache: BlockTextureCache, glitchSpriteVfx: GlitchSpriteVfx, now: Long) {
         val cell = glitchEngine.activeInfections[index]!!
-        textureCache.drawCell(canvas, tempCellRect, activeThemeKey, 9, isDock = false, now = now)
-        glitchSpriteVfx.drawGlitchOverlay(canvas, tempCellRect, now, index)
-
-        if (cell.phase == InfectionPhase.CRITICAL || cell.phase == InfectionPhase.WARNING) {
-            val badgeSize = 15f * density
-            val bx = tempCellRect.right - (badgeSize / 2f) - (2f * density)
-            val by = tempCellRect.top + (badgeSize / 2f) + (2f * density)
-
-            countdownRingPaint.color = Color.parseColor("#CC0A0F1D")
-            canvas.drawCircle(bx, by, badgeSize / 2f, countdownRingPaint)
-
-            val auraColor = if (cell.phase == InfectionPhase.CRITICAL) Color.parseColor("#FF0055") else Color.parseColor("#FFD600")
-            countdownRingPaint.color = auraColor
-            canvas.drawCircle(bx, by, (badgeSize / 2f) * 0.85f, countdownRingPaint)
-            canvas.drawText("${cell.turnsRemaining}", bx, by + (4f * density), countdownTextPaint)
+        val stage = when (cell.turnsRemaining) {
+            1 -> AnomalyStage.STAGE_3_CRITICAL
+            2 -> AnomalyStage.STAGE_2_UNSTABLE
+            0 -> AnomalyStage.STAGE_4_OBSIDIAN_SLAG
+            else -> AnomalyStage.STAGE_1_CONTAINED
         }
+        val stagedBlock = StagedGlitchBlock(
+            gridIndex = index,
+            currentStage = stage
+        )
+        stagedAnomalyBitmapRenderer.renderAnomaly(canvas, tempCellRect, stagedBlock, now)
     }
 
     private fun drawSettledBlock(canvas: Canvas, cellIndex: Int, engine: GridEngine, adventureGrid: Array<Array<GridCell>>, cellSize: Float, cellSpacing: Float, boardRect: RectF, isAdventureModeActive: Boolean, sectorCoreRenderer: SectorCoreTextureRenderer, activeThemeKey: String, textureCache: BlockTextureCache, landingStartTimes: LongArray, juiceFx: JuiceFxEngine, now: Long) {
@@ -622,7 +673,7 @@ class MasterRenderer(
         }
     }
 
-    private fun drawDock(canvas: Canvas, dockSlotBounds: Array<RectF>, dockShapes: Array<PolyShape?>, canPieceFit: (List<PolyOffset>) -> Boolean, dockCellSizePx: Int, activeThemeKey: String, textureCache: BlockTextureCache, now: Long, dragState: DragState) {
+    private fun drawDock(canvas: Canvas, dockSlotBounds: Array<RectF>, dockShapes: Array<PolyShape?>, canPieceFit: (List<PolyOffset>) -> Boolean, dockCellSizePx: Int, activeThemeKey: String, textureCache: BlockTextureCache, now: Long, dragState: DragState, isRebootLockoutActive: Boolean = false, rebootTimerSec: Float = 0f) {
         val cornerRadius = 10f * density
         val padMarginX = 2f * density
         val padMarginY = -2f * density
@@ -638,7 +689,9 @@ class MasterRenderer(
             padRect.set(slot.left + padMarginX, slot.top + padMarginY, slot.right - padMarginX, slot.bottom - padMarginY)
 
             // Dark glass background fill
+            dockPadFillPaint.alpha = if (isRebootLockoutActive) 64 else 230
             canvas.drawRoundRect(padRect, cornerRadius, cornerRadius, dockPadFillPaint)
+            dockPadFillPaint.alpha = 230
 
             // Subtle glowing border
             canvas.drawRoundRect(padRect, cornerRadius, cornerRadius, dockPadBorderPaint)
@@ -661,6 +714,21 @@ class MasterRenderer(
             if (shape != null && !isDraggingThisSlot) {
                 drawDockShape(canvas, i, dockSlotBounds, shape, canPieceFit, dockCellSizePx, activeThemeKey, textureCache, now)
             }
+        }
+
+        // 3. Central System Reboot Countdown Overlay
+        if (isRebootLockoutActive) {
+            val centerSlot = dockSlotBounds[1]
+            val cx = centerSlot.centerX()
+            val cy = centerSlot.centerY()
+
+            val rebootText = String.format(Locale.US, "REBOOT // %.1fs", rebootTimerSec.coerceAtLeast(0f))
+            val baseTextSize = 12f * density
+            comboTextPaint.textSize = baseTextSize
+            comboTextPaint.color = Color.parseColor("#FF3D00")
+            comboTextPaint.alpha = 255
+
+            canvas.drawText(rebootText, cx, cy + 4f * density, comboTextPaint)
         }
     }
 
@@ -1018,14 +1086,34 @@ class MasterRenderer(
         }
     }
 
-    private fun drawHazards(canvas: Canvas, boardRect: RectF, cellSize: Float, cellSpacing: Float, isAdventureModeActive: Boolean, hazardGrid: Array<Array<HazardCellState>>?) {
-        if (!isAdventureModeActive || hazardGrid == null) return
+    private fun drawHazards(canvas: Canvas, boardRect: RectF, cellSize: Float, cellSpacing: Float, hazardGrid: Array<Array<HazardCellState>>?, textureCache: BlockTextureCache, now: Long) {
+        if (hazardGrid == null) return
+        val pulse = (sin(now / 120.0) * 0.5 + 0.5).toFloat()
+        val pulseAlpha = (160 + pulse * 95).toInt()
+
         for (r in 0 until 8) {
             for (c in 0 until 8) {
                 val hazard = hazardGrid[r][c]
                 if (hazard.hazardType == AdventureHazardType.EMP_LOCK) {
                     calculateCellRect(r, c, cellSize, cellSpacing, boardRect, tempCellRect)
-                    canvas.drawRoundRect(tempCellRect, 8f * density, 8f * density, hazardLockPaint)
+
+                    val jammerBmp = textureCache.scaledStasisJammerBoard
+                    if (jammerBmp != null) {
+                        textureCache.filterPaint.alpha = pulseAlpha
+                        textureCache.filterPaint.colorFilter = null
+                        canvas.drawBitmap(jammerBmp, null, tempCellRect, textureCache.filterPaint)
+                        textureCache.filterPaint.alpha = 255
+                    } else {
+                        // Fallback hazard background
+                        hazardLockPaint.color = Color.parseColor("#993A0410")
+                        canvas.drawRoundRect(tempCellRect, 6f * density, 6f * density, hazardLockPaint)
+                    }
+
+                    // Pulsing Hazard Red/Orange Outer Border
+                    dangerBorderPaint.color = Color.parseColor("#FF3D00")
+                    dangerBorderPaint.alpha = pulseAlpha
+                    dangerBorderPaint.strokeWidth = 2.2f * density
+                    canvas.drawRoundRect(tempCellRect, 6f * density, 6f * density, dangerBorderPaint)
                 }
             }
         }

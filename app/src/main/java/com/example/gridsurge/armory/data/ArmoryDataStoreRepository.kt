@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.gridsurge.armory.model.ArmoryItem
+import com.example.gridsurge.armory.model.ArmoryTab
 import com.example.gridsurge.armory.model.ArmoryUserState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -87,10 +88,10 @@ class ArmoryDataStoreRepository(private val context: Context) {
 
     private fun equipDirect(prefs: MutablePreferences, item: ArmoryItem) {
         when (item.category) {
-            com.example.gridsurge.armory.model.ArmoryCategory.BLOCK_SKINS -> {
+            ArmoryTab.BLOCK_SKINS -> {
                 prefs[PreferencesKeys.EQUIPPED_BLOCK_SKIN] = item.id
             }
-            com.example.gridsurge.armory.model.ArmoryCategory.VOX_PACKS -> {
+            ArmoryTab.VOX_COMMS -> {
                 prefs[PreferencesKeys.EQUIPPED_VOX_PACK] = item.id
             }
             else -> {}

@@ -1,6 +1,6 @@
 package com.example.gridsurge.armory
 
-import com.example.gridsurge.armory.model.ArmoryCatalog
+import com.example.gridsurge.armory.data.ArmoryCatalog
 import com.example.gridsurge.armory.model.ArmoryUserState
 import com.example.gridsurge.audio.SfxManager
 import com.example.gridsurge.audio.SfxType

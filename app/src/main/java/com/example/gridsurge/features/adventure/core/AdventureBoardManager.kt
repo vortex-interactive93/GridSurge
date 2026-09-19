@@ -1,5 +1,6 @@
 package com.example.gridsurge.features.adventure.core
 
+import com.example.gridsurge.features.adventure.data.AdventureSectorRegistry
 import com.example.gridsurge.features.adventure.model.*
 import com.example.gridsurge.game.model.CoreIntegrity
 import com.example.gridsurge.game.model.CoreKind
@@ -39,6 +40,8 @@ class AdventureBoardManager(private val eventListener: AdventureEventListener) {
     var bossHp: Int = 100
     var isBossDefeated: Boolean = false
     var isAnimationDeferred: Boolean = false
+    var moveBudget: Int = 0
+    var movesRemaining: Int = 0
     private var isWave2Spawned: Boolean = false
     private var isVictoryDispatched: Boolean = false
     private var isDefeatDispatched: Boolean = false
@@ -79,6 +82,10 @@ class AdventureBoardManager(private val eventListener: AdventureEventListener) {
         isWave2Spawned = false
         isVictoryDispatched = false
         isDefeatDispatched = false
+
+        val benchmark = AdventureSectorRegistry.getBenchmark(blueprint.levelNumber)
+        moveBudget = benchmark.moveBudgetStar2 + 6
+        movesRemaining = moveBudget
 
         for (r in 0 until 8) {
             for (c in 0 until 8) {
@@ -403,6 +410,7 @@ class AdventureBoardManager(private val eventListener: AdventureEventListener) {
     }
 
     fun onMoveCommitted(elapsedSec: Int) {
+        movesRemaining--
         if (activeBlueprint?.sectorId == 2) {
             for (r in 0 until 8) {
                 for (c in 0 until 8) {
@@ -429,6 +437,9 @@ class AdventureBoardManager(private val eventListener: AdventureEventListener) {
             }
         }
         checkVictoryConditions(elapsedSec)
+        if (movesRemaining <= 0 && !isVictoryDispatched) {
+            triggerDefeat()
+        }
     }
 
     private fun transmuteToSlag(cell: GridCell, r: Int, c: Int) {

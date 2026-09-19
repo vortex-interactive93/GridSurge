@@ -15,8 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -91,7 +93,10 @@ fun CyberMissionCard(
                 Image(
                     painter = painterResource(id = iconRes),
                     contentDescription = null,
-                    modifier = if (mission.type == QuestType.COMBO) Modifier.width(50.dp).height(30.dp) else Modifier.size(42.dp),
+                    modifier = (if (mission.type == QuestType.COMBO) Modifier.width(50.dp).height(30.dp) else Modifier.size(42.dp))
+                        .graphicsLayer {
+                            blendMode = BlendMode.Screen
+                        },
                     contentScale = ContentScale.Fit
                 )
             }

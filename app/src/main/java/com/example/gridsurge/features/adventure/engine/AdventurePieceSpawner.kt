@@ -47,6 +47,19 @@ class AdventurePieceSpawner(
             }
         }
 
+        return adjustTrayForBossEndgame(tray, if (runState.isBossActive) 1 else 99, boardOccupancy)
+    }
+
+    private fun adjustTrayForBossEndgame(
+        tray: Array<PolyShape?>,
+        activeCoresRemaining: Int,
+        boardOccupancy: Float
+    ): Array<PolyShape?> {
+        if (activeCoresRemaining == 1 || boardOccupancy > 0.72f) {
+            if ((tray[0]?.offsets?.size ?: 0) > 4) {
+                tray[0] = PolyominoCatalog.instantiate(PolyominoCatalog.MONOMINO_1X1)
+            }
+        }
         return tray
     }
 

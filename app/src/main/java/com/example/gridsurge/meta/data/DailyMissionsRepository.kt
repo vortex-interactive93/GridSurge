@@ -14,6 +14,30 @@ class DailyMissionsRepository(private val context: Context) {
     private fun progressKey(missionId: String) = intPreferencesKey("mission_progress_$missionId")
     private fun claimedKey(missionId: String) = booleanPreferencesKey("mission_claimed_$missionId")
 
+    private val missionTargets = mapOf(
+        "q1" to 5,
+        "q2" to 30,
+        "q3" to 5,
+        "q4" to 10000,
+        "q5" to 2,
+        "dir_place_blocks" to 50,
+        "dir_fever_surge" to 3,
+        "dir_clear_lines" to 12,
+        "dir_anomaly_seed" to 5
+    )
+
+    fun getClaimableMissionsCount(): Flow<Int> = context.missionDataStore.data.map { prefs ->
+        var count = 0
+        missionTargets.forEach { (id, target) ->
+            val progress = prefs[progressKey(id)] ?: 0
+            val claimed = prefs[claimedKey(id)] ?: false
+            if (progress >= target && !claimed) {
+                count++
+            }
+        }
+        count
+    }
+
     fun getMissionProgress(missionId: String): Flow<Int> = context.missionDataStore.data.map { prefs ->
         prefs[progressKey(missionId)] ?: 0
     }

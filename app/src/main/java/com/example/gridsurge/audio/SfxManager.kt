@@ -65,7 +65,50 @@ enum class SfxType(@RawRes val rawResId: Int) {
     // UI & Navigation (Supports both BUTTON_CLICK and UI_CONFIRM)
     BUTTON_CLICK(R.raw.sfx_ui_confirm),
     UI_CONFIRM(R.raw.sfx_ui_confirm),
-    MODAL_WHOOSH(R.raw.sfx_modal_whoosh)
+    UI_BACK(R.raw.sfx_ui_confirm),
+    CAROUSEL_SNAP(R.raw.sfx_snap_tick),
+    MODE_DRAWER_OPEN(R.raw.sfx_modal_whoosh),
+    MODE_LOCK_IN(R.raw.sfx_ui_confirm),
+    MODAL_WHOOSH(R.raw.sfx_modal_whoosh),
+
+    // Sci-Fi Kinetic & Staging
+    CARD_SLAM(R.raw.sfx_card_slam),
+    THRUSTER_BURST(R.raw.sfx_thruster_burst),
+    AIRLOCK_OPEN(R.raw.sfx_airlock_open),
+    AIRLOCK_CLOSE(R.raw.sfx_airlock_close),
+    STASIS_FIELD(R.raw.sfx_stasis_field),
+    CORE_EXPLOSION(R.raw.sfx_core_explosion),
+    TOXIC_CLEAR(R.raw.sfx_toxic_clear),
+    LASER_LARGE(R.raw.sfx_laser_large),
+    REACTOR_HUM(R.raw.sfx_reactor_hum),
+
+    // Theme-Aware Block Skin Placement
+    SKIN_GLASS_PLACE(R.raw.sfx_skin_glass_place),
+    SKIN_METAL_PLACE(R.raw.sfx_skin_metal_place),
+    SKIN_SOLAR_PLACE(R.raw.sfx_skin_solar_place),
+    CORE_IMPACT(R.raw.sfx_core_impact),
+    RANK_CHIME(R.raw.sfx_rank_chime),
+
+    // Tactile UI Sounds
+    STAR_TOGGLE(R.raw.sfx_star_toggle),
+    SETTING_TOGGLE(R.raw.sfx_setting_toggle),
+    EMOTE_HOVER(R.raw.sfx_emote_hover),
+    UI_CLICK(R.raw.sfx_ui_click),
+    GESTURE_RELEASE(R.raw.sfx_gesture_release),
+
+    // Digital Synth Power-Ups & Relics
+    AUGMENT_DRAFTED(R.raw.sfx_augment_drafted),
+    RELIC_READY(R.raw.sfx_relic_ready),
+    WARP_VORTEX(R.raw.sfx_warp_vortex),
+    FEVER_SURGE(R.raw.sfx_fever_surge),
+    WAVE_CLEARED(R.raw.sfx_wave_cleared),
+
+    // Interface & Anomaly Sounds
+    GLITCH_PULSE(R.raw.sfx_glitch_pulse),
+    INVALID_DROP(R.raw.sfx_invalid_drop),
+    PROFILE_CONFIRM(R.raw.sfx_profile_confirm),
+    CAROUSEL_SWIPE(R.raw.sfx_carousel_swipe),
+    UI_CANCEL(R.raw.sfx_ui_cancel)
 }
 
 enum class VoxAction(val actionKey: String, val priority: AudioPriority, val cooldownMs: Long) {
@@ -119,6 +162,7 @@ object SfxManager {
     private var activeVoxPriority: AudioPriority = AudioPriority.LOW
     private var lastVoxTimestamp: Long = 0L
     private var lastCriticalWarningTimestamp: Long = 0L
+    private var lastCarouselSwipeTimestamp: Long = 0L
     private const val MIN_VOX_GAP_MS = 450L
 
     // Runtime Configuration
@@ -410,7 +454,9 @@ object SfxManager {
 
     fun playSfx(
         type: SfxType,
-        overridePitch: Float = 1.0f,
+        volume: Float = 1.0f,
+        pitchRate: Float = 1.0f,
+        overridePitch: Float = pitchRate,
         pitchJitter: Float = 0.0f,
         priority: Int = 1,
         volumeMultiplier: Float = 1.0f
@@ -424,25 +470,43 @@ object SfxManager {
         val soundId = sfxSoundIds[index]
         if (soundId == 0) return
 
+        if (type == SfxType.CAROUSEL_SWIPE || type == SfxType.CAROUSEL_SNAP) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastCarouselSwipeTimestamp < 220L) return
+            lastCarouselSwipeTimestamp = now
+        }
+
+        val effectivePitch = if (overridePitch != 1.0f) overridePitch else pitchRate
         val finalPitch = if (pitchJitter > 0f) {
-            overridePitch + (Math.random().toFloat() * pitchJitter * 2 - pitchJitter)
+            effectivePitch + (Math.random().toFloat() * pitchJitter * 2 - pitchJitter)
         } else {
-            overridePitch
+            effectivePitch
         }.coerceIn(0.5f, 2.0f)
 
         // Integrated dynamic VOX ducking factor:
-        val finalVolume = (sfxVolume * volumeMultiplier * sfxVolumeScale * activeVoxDuckingFactor).coerceIn(0f, 1f)
+        val finalVolume = (sfxVolume * volume * volumeMultiplier * sfxVolumeScale * activeVoxDuckingFactor).coerceIn(0f, 1f)
         soundPool?.play(soundId, finalVolume, finalVolume, priority, 0, finalPitch)
     }
 
-    fun playPlacementSound(isSpecial: Boolean = false) {
+    fun playTilePickup() {
+        playSfx(SfxType.TILE_PICKUP, overridePitch = 1.0f, volumeMultiplier = 1.0f)
+        triggerHaptic(HapticType.LIGHT_TICK)
+    }
+
+    fun playPlacementSound(isSpecial: Boolean = false, skinId: String? = null) {
         if (isSpecial) {
             playSfx(SfxType.SPECIAL_BLOCK_PLACE, overridePitch = 1.0f, volumeMultiplier = 1.0f)
             triggerHaptic(HapticType.CLICK)
             return
         }
 
-        val placeType = if (placeAlternateFlag) SfxType.BLOCK_PLACE_2 else SfxType.BLOCK_PLACE_3
+        val skinSfx = when (skinId?.lowercase()) {
+            "skin_titan", "metal", "chrome", "forge" -> SfxType.SKIN_METAL_PLACE
+            "skin_solar", "solar", "gold" -> SfxType.SKIN_SOLAR_PLACE
+            else -> null // Default and Midnight Glass play the original block placement sound
+        }
+
+        val placeType = skinSfx ?: if (placeAlternateFlag) SfxType.BLOCK_PLACE_2 else SfxType.BLOCK_PLACE_3
         placeAlternateFlag = !placeAlternateFlag
 
         playSfx(placeType, pitchJitter = 0.04f, volumeMultiplier = 1.0f)
@@ -497,9 +561,28 @@ object SfxManager {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val effect = when (type) {
-                HapticType.LIGHT_TICK -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
-                HapticType.CLICK -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
-                HapticType.HEAVY_IMPACT -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
+                HapticType.LIGHT_TICK -> {
+                    // Amplitude-calibrated 12ms pulse ensures ERM motors (A16) and LRA motors (Fold 8) both produce a crisp 1-cell tick
+                    if (vib.hasAmplitudeControl()) {
+                        VibrationEffect.createOneShot(12L, 160)
+                    } else {
+                        VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                    }
+                }
+                HapticType.CLICK -> {
+                    if (vib.hasAmplitudeControl()) {
+                        VibrationEffect.createOneShot(18L, 210)
+                    } else {
+                        VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+                    }
+                }
+                HapticType.HEAVY_IMPACT -> {
+                    if (vib.hasAmplitudeControl()) {
+                        VibrationEffect.createOneShot(32L, 255)
+                    } else {
+                        VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
+                    }
+                }
                 HapticType.DOUBLE_CRACK -> VibrationEffect.createWaveform(longArrayOf(0, 20, 35, 30), intArrayOf(0, 180, 0, 255), -1)
                 HapticType.SURGE_EXPLOSION -> VibrationEffect.createWaveform(longArrayOf(0, 30, 25, 60), intArrayOf(0, 200, 0, 255), -1)
             }
@@ -507,7 +590,7 @@ object SfxManager {
         } else {
             @Suppress("DEPRECATION")
             when (type) {
-                HapticType.LIGHT_TICK -> vib.vibrate(10)
+                HapticType.LIGHT_TICK -> vib.vibrate(12)
                 HapticType.CLICK -> vib.vibrate(25)
                 HapticType.HEAVY_IMPACT -> vib.vibrate(50)
                 HapticType.DOUBLE_CRACK -> vib.vibrate(longArrayOf(0, 20, 35, 30), -1)
@@ -518,21 +601,106 @@ object SfxManager {
 
     // --- Preview Methods ---
 
-    fun playVoxPreview(volume: Float) {
-        voxVolumeScale = volume
-        isVoxMuted = volume <= 0f
-        if (volume > 0f) {
-            val packIndex = activeVoicePack.ordinal
-            val actionIndex = VoxAction.OVERDRIVE.ordinal
-            
-            if (packIndex < voxSoundMatrix.size && actionIndex < voxSoundMatrix[packIndex].size) {
-                var soundId = voxSoundMatrix[packIndex][actionIndex]
-                if (soundId == 0) soundId = voxSoundMatrix[VoicePackId.DEFAULT.ordinal][actionIndex]
-                
-                if (soundId != 0) {
-                    soundPool?.play(soundId, volume, volume, 3, 0, 1.0f)
-                }
+    fun auditionVoxPack(voxId: String, action: VoxAction = VoxAction.OVERDRIVE) {
+        val pool = soundPool ?: return
+        if (isVoxMuted) return
+
+        val pack = when (voxId.lowercase()) {
+            "vox_nexus", "cyber", "nexus" -> VoicePackId.CYBER_AI
+            "vox_solar", "solar" -> VoicePackId.SOLAR_PILOT
+            "vox_void", "void" -> VoicePackId.VOID_ORACLE
+            else -> VoicePackId.DEFAULT
+        }
+
+        val packIndex = pack.ordinal
+        val actionIndex = action.ordinal
+
+        var soundId = 0
+        if (packIndex < voxSoundMatrix.size && actionIndex < voxSoundMatrix[packIndex].size) {
+            soundId = voxSoundMatrix[packIndex][actionIndex]
+        }
+
+        if (soundId == 0) {
+            val defaultOrdinal = VoicePackId.DEFAULT.ordinal
+            if (defaultOrdinal < voxSoundMatrix.size && actionIndex < voxSoundMatrix[defaultOrdinal].size) {
+                soundId = voxSoundMatrix[defaultOrdinal][actionIndex]
             }
+        }
+
+        if (soundId == 0) return
+
+        if (activeVoxStreamId != 0) {
+            pool.stop(activeVoxStreamId)
+        }
+
+        val finalVol = (voxVolume * voxVolumeScale * 1.0f).coerceIn(0f, 1f)
+        activeVoxStreamId = pool.play(soundId, finalVol, finalVol, 1, 0, 1.0f)
+    }
+
+    fun playVoxPreview(volume: Float) {
+        val pool = soundPool ?: return
+        voxVolume = volume
+        voxVolumeScale = 1.0f
+        isVoxMuted = volume <= 0.01f
+
+        if (volume <= 0.01f) {
+            if (activeVoxStreamId != 0) {
+                pool.stop(activeVoxStreamId)
+                activeVoxStreamId = 0
+            }
+            return
+        }
+
+        val packIndex = activeVoicePack.ordinal
+        val actionIndex = VoxAction.DEPLOY.ordinal
+        
+        var soundId = 0
+        if (packIndex < voxSoundMatrix.size && actionIndex < voxSoundMatrix[packIndex].size) {
+            soundId = voxSoundMatrix[packIndex][actionIndex]
+        }
+        
+        // Fallback 1: Check Default Pack DEPLOY
+        if (soundId == 0) {
+            val defaultOrdinal = VoicePackId.DEFAULT.ordinal
+            if (defaultOrdinal < voxSoundMatrix.size && actionIndex < voxSoundMatrix[defaultOrdinal].size) {
+                soundId = voxSoundMatrix[defaultOrdinal][actionIndex]
+            }
+        }
+
+        // Fallback 2: Check OVERDRIVE
+        if (soundId == 0) {
+            val overdriveIndex = VoxAction.OVERDRIVE.ordinal
+            if (packIndex < voxSoundMatrix.size && overdriveIndex < voxSoundMatrix[packIndex].size) {
+                soundId = voxSoundMatrix[packIndex][overdriveIndex]
+            }
+        }
+
+        if (soundId == 0) return
+
+        // Stop active stream to prevent overlapping vocal chatter
+        if (activeVoxStreamId != 0) {
+            pool.stop(activeVoxStreamId)
+            activeVoxStreamId = 0
+        }
+
+        // Dynamic BGM Ducking
+        try {
+            BgmManager.duckVolume(durationMs = 1800L, duckRatio = 0.25f, fadeBackMs = 350L)
+        } catch (_: Exception) {}
+
+        val streamId = pool.play(
+            soundId,
+            volume.coerceIn(0f, 1f),
+            volume.coerceIn(0f, 1f),
+            15, // High priority stream
+            0,
+            1.0f
+        )
+
+        if (streamId != 0) {
+            activeVoxStreamId = streamId
+            activeVoxPriority = AudioPriority.HIGH
+            lastVoxTimestamp = SystemClock.elapsedRealtime()
         }
     }
 

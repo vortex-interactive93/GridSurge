@@ -23,6 +23,7 @@ object BackgroundThemeManager {
             }
             GameModeType.DAILY_GLITCH -> R.drawable.bg_glitch_mode
             GameModeType.TIME_BLITZ -> R.drawable.bg_sector_quantum_singularity
+            GameModeType.BLITZ_CLASH -> R.drawable.bg_sector_quantum_singularity
         }
     }
 

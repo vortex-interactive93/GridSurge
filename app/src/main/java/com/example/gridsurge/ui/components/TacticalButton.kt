@@ -16,11 +16,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.gridsurge.ui.theme.ChakraPetchFontFamily
 
 @Composable
 fun TacticalButton(
@@ -91,7 +91,7 @@ fun TacticalButton(
                 color = if (enabled) color else Color(0xFF5C8599),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = ChakraPetchFontFamily,
                 letterSpacing = 1.5.sp,
                 textAlign = TextAlign.Center
             )

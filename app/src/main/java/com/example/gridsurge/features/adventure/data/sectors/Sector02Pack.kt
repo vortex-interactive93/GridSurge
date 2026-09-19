@@ -16,38 +16,37 @@ object Sector02Pack : BaseSectorPack(
         baseDifficultyRating = 2
     ),
     stages = listOf(
-        // Stage 1 (Global 10)
+        // Stage 1: Incursion Calibration (Off-Center Single Furnace)
         StageDefinition(
             stageId = StageId(2, 1),
             blueprint = StageBlueprint(
                 stageName = "THERMAL IGNITION",
-                directive = "Detonate 2 Solar Crucibles and clear 6 lines before thermal overload.",
+                directive = "Detonate the off-center Solar Crucible before thermal countdown expires.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "2 SOLAR CRUCIBLES PURGED",
-                    targetAmount = 2,
-                    star3TimeSec = 45,
-                    star2TimeSec = 80
+                    title = "1 SOLAR CRUCIBLE PURGED",
+                    targetAmount = 1,
+                    star3TimeSec = 30,
+                    star2TimeSec = 55
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
+                    CorePlacementSpec(col = 4, row = 2, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 1500,
-                targetScore2Star = 3000,
-                targetScore3Star = 5000,
-                moveBudgetStar2 = 14,
-                timeLimitSecStar2 = 35,
+                targetScore1Star = 1000,
+                targetScore2Star = 1500,
+                targetScore3Star = 2000,
+                moveBudgetStar2 = 12,
+                timeLimitSecStar2 = 40,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MULTI_LINE_CLEAR,
                     targetValue = 2,
-                    description = "Mastery: Clear 2+ lines in a single drop"
+                    description = "Clear 2+ lines before thermal melt"
                 )
             )
         ),
-        // Stage 2 (Global 11)
+        // Stage 2: Line Cleanse Protocol
         StageDefinition(
             stageId = StageId(2, 2),
             blueprint = StageBlueprint(
@@ -58,88 +57,88 @@ object Sector02Pack : BaseSectorPack(
                     title = "5 LINES CLEARED",
                     targetAmount = 5,
                     star3TimeSec = 35,
-                    star2TimeSec = 60
+                    star2TimeSec = 65
                 ),
                 initialCores = emptyList()
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 1800,
-                targetScore2Star = 3500,
-                targetScore3Star = 5500,
+                targetScore1Star = 1500,
+                targetScore2Star = 2800,
+                targetScore3Star = 4000,
                 moveBudgetStar2 = 14,
-                timeLimitSecStar2 = 40,
+                timeLimitSecStar2 = 45,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
-                    targetValue = 3,
-                    description = "Mastery: Sustain a 3x Surge Streak"
+                    targetValue = 2,
+                    description = "Sustain a 2x Surge Streak"
                 )
             )
         ),
-        // Stage 3 (Global 12)
+        // Stage 3: Asymmetrical Duo
         StageDefinition(
             stageId = StageId(2, 3),
             blueprint = StageBlueprint(
-                stageName = "TWIN CRUCIBLE CONVERGENCE",
-                directive = "Neutralize 2 Amber Furnaces located on opposing diagonals.",
+                stageName = "OFFSET CRUCIBLES",
+                directive = "Detonate 2 Solar Crucibles at offset coordinates before meltdown.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
                     title = "2 CRUCIBLES PURGED",
                     targetAmount = 2,
                     star3TimeSec = 40,
-                    star2TimeSec = 70
+                    star2TimeSec = 75
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 2, row = 2, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 5, row = 5, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
+                    CorePlacementSpec(col = 1, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 4, row = 5, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 2000,
-                targetScore2Star = 4000,
-                targetScore3Star = 6000,
-                moveBudgetStar2 = 15,
-                timeLimitSecStar2 = 45,
+                targetScore1Star = 1800,
+                targetScore2Star = 3500,
+                targetScore3Star = 5200,
+                moveBudgetStar2 = 16,
+                timeLimitSecStar2 = 50,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MULTI_LINE_CLEAR,
                     targetValue = 2,
-                    description = "Mastery: Detonate both furnaces with 0 slag created"
+                    description = "Clear 2+ lines in a single drop"
                 )
             )
         ),
-        // Stage 4 (Global 13)
+        // Stage 4: Chroma Synthesis
         StageDefinition(
             stageId = StageId(2, 4),
             blueprint = StageBlueprint(
-                stageName = "SOLAR CONDUIT SYNTHESIS",
-                directive = "Synthesize and clear 35 Circuit Conduit tiles.",
+                stageName = "SOLAR SYNTHESIS",
+                directive = "Synthesize 30 energy tiles while containing thermal heat.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.CHROMA_SYNTHESIS,
-                    title = "35 CIRCUIT TILES",
-                    targetAmount = 35,
+                    title = "30 TILES SYNTHESIZED",
+                    targetAmount = 30,
                     star3TimeSec = 45,
                     star2TimeSec = 80
                 ),
                 initialCores = emptyList()
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 2200,
-                targetScore2Star = 4500,
-                targetScore3Star = 7000,
-                moveBudgetStar2 = 20,
-                timeLimitSecStar2 = 60,
+                targetScore1Star = 2000,
+                targetScore2Star = 4000,
+                targetScore3Star = 6000,
+                moveBudgetStar2 = 18,
+                timeLimitSecStar2 = 55,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.SCORE_THRESHOLD,
                     targetValue = 4500,
-                    description = "Mastery: Accumulate ≥ 4,500 points"
+                    description = "Reach 4,500 points during synthesis"
                 )
             )
         ),
-        // Stage 5 (Global 14)
+        // Stage 5: Perimeter Confinement
         StageDefinition(
             stageId = StageId(2, 5),
             blueprint = StageBlueprint(
-                stageName = "TRI-APERTURE MELTDOWN",
-                directive = "Neutralize 3 Amber Furnaces before they transmute into slag.",
+                stageName = "FURNACE WALL LOCKDOWN",
+                directive = "Purge 3 Solar Crucibles positioned in an L-shaped thermal wall.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
                     title = "3 CRUCIBLES PURGED",
@@ -148,60 +147,60 @@ object Sector02Pack : BaseSectorPack(
                     star2TimeSec = 90
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 3, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
+                    CorePlacementSpec(col = 2, row = 2, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 2, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 3, row = 2, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 2500,
-                targetScore2Star = 4500,
-                targetScore3Star = 6500,
-                moveBudgetStar2 = 18,
-                timeLimitSecStar2 = 60,
+                targetScore2Star = 4800,
+                targetScore3Star = 7200,
+                moveBudgetStar2 = 22,
+                timeLimitSecStar2 = 65,
                 masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
-                    targetValue = 2,
-                    description = "Mastery: Execute a 2+ line clear in a single drop"
+                    featType = MasteryFeatType.MIN_COMBO_STREAK,
+                    targetValue = 3,
+                    description = "Sustain a 3x Surge Streak"
                 )
             )
         ),
-        // Stage 6 (Global 15)
+        // Stage 6: Momentum Harmonic
         StageDefinition(
             stageId = StageId(2, 6),
             blueprint = StageBlueprint(
-                stageName = "THERMAL MOMENTUM HARMONIC",
-                directive = "Achieve a 4x Surge Streak before any furnace expires.",
+                stageName = "THERMAL STREAK HARMONIC",
+                directive = "Sustain a 3x Surge Streak to prevent molten slag explosion.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.SURGE_STREAK_TARGET,
-                    title = "4x SURGE STREAK",
-                    targetAmount = 4,
-                    star3TimeSec = 40,
-                    star2TimeSec = 75
+                    title = "3X SURGE STREAK REACHED",
+                    targetAmount = 3,
+                    star3TimeSec = 50,
+                    star2TimeSec = 95
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
+                    CorePlacementSpec(col = 4, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 3)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 2800,
                 targetScore2Star = 5200,
                 targetScore3Star = 8000,
-                moveBudgetStar2 = 16,
-                timeLimitSecStar2 = 45,
+                moveBudgetStar2 = 22,
+                timeLimitSecStar2 = 70,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
-                    targetValue = 4,
-                    description = "Mastery: Reach a 4x Surge Streak"
+                    targetValue = 3,
+                    description = "Reach a 3x Surge Streak"
                 )
             )
         ),
-        // Stage 7 (Global 16)
+        // Stage 7: Subspace Overclock
         StageDefinition(
             stageId = StageId(2, 7),
             blueprint = StageBlueprint(
-                stageName = "QUAD CRUCIBLE OVERLOAD",
-                directive = "Neutralize all 4 corner Amber Furnaces using cross-laser chain reactions.",
+                stageName = "QUAD CRUCIBLE CHOKEPOINT",
+                directive = "Neutralize 4 Solar Crucibles at asymmetric choke points before meltdown.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
                     title = "4 CRUCIBLES PURGED",
@@ -210,87 +209,87 @@ object Sector02Pack : BaseSectorPack(
                     star2TimeSec = 100
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 1, row = 2, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 3, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
                     CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
+                    CorePlacementSpec(col = 6, row = 4, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 3000,
-                targetScore2Star = 5000,
-                targetScore3Star = 7500,
-                moveBudgetStar2 = 22,
-                timeLimitSecStar2 = 70,
+                targetScore2Star = 5800,
+                targetScore3Star = 9000,
+                moveBudgetStar2 = 24,
+                timeLimitSecStar2 = 80,
                 masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.SCORE_THRESHOLD,
-                    targetValue = 4500,
-                    description = "Mastery: Accumulate ≥ 4,500 points"
+                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
+                    targetValue = 2,
+                    description = "Execute a multi-line clear"
                 )
             )
         ),
-        // Stage 8 (Global 17)
+        // Stage 8: Dual-Wave Escalation
         StageDefinition(
             stageId = StageId(2, 8),
             blueprint = StageBlueprint(
-                stageName = "MOLTEN REINFORCEMENTS",
-                directive = "Neutralize 4 Amber Furnaces across 2 consecutive thermal waves.",
+                stageName = "DUAL WAVE CRUCIBLE ESCALATION",
+                directive = "Purge 4 Solar Crucibles across 2 defensive waves.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "4 CRUCIBLES (2 WAVES)",
+                    title = "4 CRUCIBLES PURGED (2 WAVES)",
                     targetAmount = 4,
                     star3TimeSec = 60,
                     star2TimeSec = 110
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 2, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 5, row = 4, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
+                    CorePlacementSpec(col = 1, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 6, row = 2, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 3200,
+                targetScore1Star = 3500,
                 targetScore2Star = 6500,
-                targetScore3Star = 9500,
-                moveBudgetStar2 = 24,
-                timeLimitSecStar2 = 80,
+                targetScore3Star = 9800,
+                moveBudgetStar2 = 26,
+                timeLimitSecStar2 = 90,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
                     targetValue = 3,
-                    description = "Mastery: Chain a 3x Streak through Wave 2"
+                    description = "Sustain a 3x Surge Streak"
                 )
             )
         ),
-        // Stage 9 (Global 18, Boss)
+        // Stage 9: Sector Apex Boss
         StageDefinition(
             stageId = StageId(2, 9),
             blueprint = StageBlueprint(
-                stageName = "SOLAR COLOSSUS // APEX",
-                directive = "Phase 1: Destroy 4 Thermal Relay Pylons.\nPhase 2: Strike the central Solar Core before it vents heat slag.",
+                stageName = "SOLAR FORGE OVERLORD // APEX",
+                directive = "Phase 1: Neutralize 4 Thermal Pylons.\nPhase 2: Strike the central Forge Core 3x to extinguish meltdown.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "SOLAR COLOSSUS DESTROYED",
+                    title = "FORGE OVERLORD DEFEATED",
                     targetAmount = 5,
-                    star3TimeSec = 85,
-                    star2TimeSec = 150
+                    star3TimeSec = 80,
+                    star2TimeSec = 130
                 ),
                 initialCores = listOf(
                     CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 3, isLocked = true),
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
+                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 1),
+                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 1),
+                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 1),
+                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 1)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 4000,
+                targetScore1Star = 4500,
                 targetScore2Star = 7500,
                 targetScore3Star = 11000,
                 moveBudgetStar2 = 28,
-                timeLimitSecStar2 = 100,
+                timeLimitSecStar2 = 95,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.NO_EMP_JAMMED,
                     targetValue = 1,
-                    description = "Mastery: Defeat Solar Colossus with 0 slots jammed"
+                    description = "Defeat Overlord with 0 slots jammed"
                 )
             )
         )

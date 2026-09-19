@@ -42,6 +42,17 @@ class GridEngine {
         private const val MAX_SAFE_SCORE = Long.MAX_VALUE - 1_000_000L
     }
 
+    fun clearCenter4x4() {
+        for (r in 2..5) {
+            for (c in 2..5) {
+                val idx = r * gridSize + c
+                grid[idx] = CellType.EMPTY.id
+                colorGrid[idx] = 0
+                specialGrid[idx] = SpecialBlockType.NONE
+            }
+        }
+    }
+
     fun resetGame() {
         grid.fill(CellType.EMPTY.id)
         colorGrid.fill(0)

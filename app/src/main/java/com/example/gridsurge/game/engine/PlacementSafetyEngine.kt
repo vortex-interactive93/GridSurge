@@ -1,6 +1,7 @@
 package com.example.gridsurge.game.engine
 
 import com.example.gridsurge.features.adventure.model.AdventureHazardType
+import com.example.gridsurge.features.adventure.model.HazardCellState
 import com.example.gridsurge.game.model.GridCell
 import com.example.gridsurge.game.model.PolyShape
 import com.example.gridsurge.game.model.SpecialBlockType
@@ -34,6 +35,28 @@ object PlacementSafetyEngine {
                     if (canPieceFitAt(shape, c, r, engineGrid, adventureGrid, hazardGrid)) {
                         return true
                     }
+                }
+            }
+        }
+        return false
+    }
+
+    fun canSinglePieceFit(
+        shape: PolyShape?,
+        engineGrid: IntArray,
+        adventureGrid: Array<Array<GridCell>>? = null,
+        hazardGrid: Array<Array<HazardCellState>>? = null
+    ): Boolean {
+        if (shape == null) return true
+        if (shape.specialType == SpecialBlockType.QUANTUM_WARP_VORTEX ||
+            shape.specialType == SpecialBlockType.CATALYST_CROSSHAIR ||
+            shape.specialType == SpecialBlockType.NOVA_CORE_EXPLOSION) {
+            return true
+        }
+        for (r in 0 until 8) {
+            for (c in 0 until 8) {
+                if (canPieceFitAt(shape, c, r, engineGrid, adventureGrid, hazardGrid)) {
+                    return true
                 }
             }
         }

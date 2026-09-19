@@ -1,9 +1,12 @@
 package com.example.gridsurge.game
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.*
+import com.example.gridsurge.ads.AdManager
 import android.os.SystemClock
 import android.util.AttributeSet
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import com.example.gridsurge.features.adventure.engine.RelicCyberWareManager
@@ -19,8 +22,12 @@ import com.example.gridsurge.audio.VoxAction
 import com.example.gridsurge.core.CellType
 import com.example.gridsurge.core.ClearResult
 import com.example.gridsurge.core.GridEngine
-import com.example.gridsurge.game.blitz.BlitzState
+import com.example.gridsurge.game.blitz.model.BlitzPhase
+import com.example.gridsurge.game.blitz.model.BlitzTerminalPhase
+import com.example.gridsurge.game.blitz.model.BlitzTerminalSequenceState
 import com.example.gridsurge.game.blitz.TimeBlitzEngine
+import com.example.gridsurge.monetization.engine.SmartAdPacingEngine
+import com.example.gridsurge.monetization.model.AdEligibilityResult
 import com.example.gridsurge.game.fx.*
 import com.example.gridsurge.game.glitch.GlitchEngine
 import com.example.gridsurge.game.glitch.SeededGlitchMatchController
@@ -28,6 +35,7 @@ import com.example.gridsurge.game.model.*
 import com.example.gridsurge.game.particle.CyberParticleSystem
 import com.example.gridsurge.game.render.*
 import com.example.gridsurge.features.adventure.rendering.*
+import com.example.gridsurge.game.clash.network.engine.DeterministicPieceStream
 import com.example.gridsurge.game.engine.BitboardFeasibilityEngine
 import com.example.gridsurge.game.engine.GhostDuelEngine
 import com.example.gridsurge.game.input.InteractionHandler
@@ -43,6 +51,7 @@ import com.example.gridsurge.meta.quests.QuestType
 import com.example.gridsurge.theme.ThemeNormalizer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 class GridSurgeGameView @JvmOverloads constructor(
     context: Context,
@@ -124,9 +133,38 @@ class GridSurgeGameView @JvmOverloads constructor(
     private val clashHudRenderer = BlitzClashHudRenderer(density)
     private val interactionHandler = InteractionHandler(density, this)
     private val adventureController = AdventureModeController(engine, adventureBoard, bossEngine, runState, juiceCoordinator)
-    private val blitzController = BlitzModeController(engine, blitzEngine, juiceCoordinator)
+    val blitzController = BlitzModeController(engine, blitzEngine, juiceCoordinator)
     private val glitchController = GlitchModeController(engine, glitchEngine, juiceCoordinator)
     private val classicController = ClassicModeController(engine, juiceCoordinator)
+
+    init {
+        blitzEngine.onFeverActivated = {
+            SfxManager.playSfx(SfxType.OVERDRIVE_ACTIVATE)
+            SfxManager.playVox(VoxAction.OVERDRIVE)
+            trauma = 0.60f
+            onDirectiveEvent?.invoke("dir_fever_surge", 1)
+        }
+        blitzEngine.onFeverDeactivated = {
+            renderer.exhaustRenderer.triggerExhaustVent(boardRect)
+            SfxManager.playSfx(SfxType.MODAL_WHOOSH, overridePitch = 0.5f)
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
+        blitzEngine.onFeverExtended = { event ->
+            juiceCoordinator.spawnPopup(
+                boardRect.centerX(),
+                boardRect.centerY() - (45f * density),
+                event.displayTag,
+                Color.parseColor("#FFFFD600"),
+                1200L
+            )
+            SfxManager.playSfx(SfxType.SNAP_TICK, overridePitch = 1.45f)
+            trauma = (trauma + 0.35f).coerceAtMost(1.0f)
+        }
+    }
+
+    val smartAdPacingEngine = SmartAdPacingEngine()
+    var activePreloaderElapsedMs = 0L
+    private var previousScoreDelta = 0L
 
     // Pre-allocated closure reference for zero-GC render loop
     private val pieceFitChecker: (List<PolyOffset>) -> Boolean = { offsets -> canPieceFitOnGrid(offsets) }
@@ -140,6 +178,13 @@ class GridSurgeGameView @JvmOverloads constructor(
     var isTouchLocked = false
     var matchPhase = MatchPhase.IN_PROGRESS
     var isObjectiveMet = false
+    private var meltdownJob: Job? = null
+    private var buzzerGraceTimer = 0.5f
+    private var hasBuzzerBeaterGraceExpired = false
+    private var rebootStrikeCount = 0
+    var isRebootLockoutActive = false
+    var rebootTimerSec = 0f
+    val blitzTerminalSequenceState = BlitzTerminalSequenceState()
     var currentScore: Long = 0L
     var movesPlayedThisStage = 0
     var elapsedSeconds = 0
@@ -165,16 +210,20 @@ class GridSurgeGameView @JvmOverloads constructor(
     private var relicActivationsCountThisStage = 0
     private var empJamOccurredThisStage = false
     private var activeMilestoneBanner = MilestoneBannerState("", Color.CYAN, 0L, 1400L, false)
-    private val ghostDuelEngine = GhostDuelEngine(mainScope, { postInvalidateOnAnimation() }, { if(it) SfxManager.playVox(VoxAction.LEAD_SECURED) else SfxManager.playVox(VoxAction.LEAD_LOST) }, { w, p, r -> handleDuelFinished(w, p, r) }, { t -> handleDuelTimer(t) }, { s -> triggerClashJammer(s) }, { s, c -> logRivalMove(s, c) })
+    val ghostDuelEngine = GhostDuelEngine(mainScope, { postInvalidateOnAnimation() }, { if(it) SfxManager.playVox(VoxAction.LEAD_SECURED) else SfxManager.playVox(VoxAction.LEAD_LOST) }, { w, p, r -> handleDuelFinished(w, p, r) }, { t -> handleDuelTimer(t) }, { s -> triggerClashJammer(s) }, { s, c -> logRivalMove(s, c) })
 
     var hasUsedReviveThisRun = false
     var currentAdventureLevelNumber: Int = 1
     val activeBlueprint: AdventureLevelBlueprint? get() = adventureBoard.activeBlueprint
     val currentRivalScore: Long get() = ghostDuelEngine.rivalScore
     val currentDuelRemainingSeconds: Int get() = ghostDuelEngine.matchSecondsRemaining
+    private var liveStartEpochMs: Long = 0L
 
     private var lastDropPxX: Float = 0f
     private var lastDropPxY: Float = 0f
+
+    private var maxComboInMatch = 1
+    private var totalLinesInMatch = 0
 
     // --- Reactive Callbacks ---
     var onAdventureStateUpdated: ((Int, Long, Int, Int, Boolean, Int, Int, Int, Int, Int, Int, Float, Float, Float, Float) -> Unit)? = null
@@ -183,8 +232,11 @@ class GridSurgeGameView @JvmOverloads constructor(
     var onGameOver: (() -> Unit)? = null
     var onStageVictoryEvaluated: ((Int, Long, StarEvaluationResult, Int) -> Unit)? = null
     var onStageDefeat: (() -> Unit)? = null
-    var onClashFinished: ((Boolean, Long, Long, Int, Int, Int, MatchReplayData) -> Unit)? = null
+    var onClashFinished: ((Boolean, Long, Long, Int, Int, Int, Int, MatchReplayData) -> Unit)? = null
+    var onBroadcastLiveMove: ((Long, Int, Int, Boolean, Boolean) -> Unit)? = null
     var onMissionEvent: ((QuestType, Int) -> Unit)? = null
+    var onDirectiveEvent: ((String, Int) -> Unit)? = null
+    var onVectorLineClear: ((List<ClearedLineEvent>) -> Unit)? = null
 
     init {
         ghostDuelEngine.playerScoreProvider = { currentScore }
@@ -201,33 +253,54 @@ class GridSurgeGameView @JvmOverloads constructor(
         if (w <= 0 || h <= 0) return
 
         val horizontalMargin = 16f * density
-        val availableWidth = w - horizontalMargin * 2f
+        val cellSpacing = 3f * density
+        val maxAvailableWidth = w - horizontalMargin * 2f
 
-        // Position 8x8 grid lower to fill the dark space below header (Yellow Dot placement)
-        val topMargin = (h * 0.165f).coerceIn(120f * density, 150f * density)
+        // 1. Correct Safe Zones
+        // Compose's Modifier.weight(1f) already pushed us below the HUD. We only need minor breathing room.
+        val topClearance = 16f * density 
+        // We still need full bottom clearance to fit both the Emote Button and the Dock blocks
+        val bottomClearance = 180f * density 
 
-        interactionHandler.cellSize = (availableWidth - (3.5f * density * 9)) / 8f
-        currentCellSizePx = interactionHandler.cellSize.toInt()
-        interactionHandler.cellSpacing = 3.5f * density
-        interactionHandler.boardRect.set(horizontalMargin, topMargin, horizontalMargin + availableWidth, topMargin + availableWidth)
+        val availableHeight = (h - topClearance - bottomClearance).coerceAtLeast(100f * density)
+
+        // 2. Constrain Cell Size safely
+        val cellSizeFromWidth = (maxAvailableWidth - (cellSpacing * 9f)) / 8f
+        val cellSizeFromHeight = (availableHeight - (cellSpacing * 9f)) / 8f
+
+        val calculatedCellSize = minOf(cellSizeFromWidth, cellSizeFromHeight).coerceAtLeast(24f * density)
+        val boardSideLength = calculatedCellSize * 8f + cellSpacing * 9f
+
+        // 3. Center the board strictly inside the remaining space
+        val verticalRemainder = (availableHeight - boardSideLength).coerceAtLeast(0f)
+        val boardLeft = (w - boardSideLength) / 2f
+        val boardTop = topClearance + (verticalRemainder / 2f) 
+
+        interactionHandler.cellSize = calculatedCellSize
+        currentCellSizePx = calculatedCellSize.toInt()
+        renderer.stagedAnomalyBitmapRenderer.prewarmBitmaps(currentCellSizePx)
+        interactionHandler.cellSpacing = cellSpacing
+
+        interactionHandler.boardRect.set(boardLeft, boardTop, boardLeft + boardSideLength, boardTop + boardSideLength)
         boardRect.set(interactionHandler.boardRect)
-
         juiceCoordinator.boardRect.set(boardRect)
-        juiceCoordinator.cellSize = interactionHandler.cellSize
-        juiceCoordinator.cellSpacing = interactionHandler.cellSpacing
+        juiceCoordinator.cellSize = calculatedCellSize
+        juiceCoordinator.cellSpacing = cellSpacing
 
-        // Position floating dock pieces lower down closer to emitter pods (Red Arrow placement)
-        val dockTop = boardRect.bottom + 65f * density
+        // 4. Position the Dock (Anchored precisely 24dp from the bottom)
+        val dockReservedHeight = 85f * density
+        val bottomMargin = 24f * density
+        val dockTop = h - dockReservedHeight - bottomMargin
+        
         val slotSpacing = 8f * density
-        val slotWidth = (availableWidth - slotSpacing * 2) / 3f
-        val slotHeight = 95f * density
+        val slotWidth = (maxAvailableWidth - slotSpacing * 2f) / 3f
 
         for (i in 0 until 3) {
             interactionHandler.dockSlotBounds[i].set(
                 horizontalMargin + i * (slotWidth + slotSpacing),
                 dockTop,
                 horizontalMargin + i * (slotWidth + slotSpacing) + slotWidth,
-                dockTop + slotHeight
+                dockTop + dockReservedHeight
             )
             dockSlotBounds[i].set(interactionHandler.dockSlotBounds[i])
         }
@@ -242,8 +315,9 @@ class GridSurgeGameView @JvmOverloads constructor(
         val now = SystemClock.uptimeMillis()
         if (!isEnginePaused && lastRealTimeMs > 0) animationTimeMs += (now - lastRealTimeMs)
         lastRealTimeMs = now
-        val dt = if (isEnginePaused) 0f else (System.nanoTime() - lastFrameTime) / 1_000_000_000f
+        val rawDt = if (isEnginePaused) 0f else (System.nanoTime() - lastFrameTime) / 1_000_000_000f
         lastFrameTime = System.nanoTime()
+        val dt = rawDt.coerceIn(0f, 0.1f)
         
         if (!isEnginePaused && dt > 0f) {
             vfxPool.update(dt)
@@ -252,22 +326,43 @@ class GridSurgeGameView @JvmOverloads constructor(
 
             // Live Time Blitz countdown or elapsed match timer
             if (isTimeBlitzModeActive) {
-                val blitzState = blitzEngine.updateFrame(dt)
+                val phase = blitzEngine.updateFrame(dt)
                 val updatedSec = blitzEngine.secondsRemaining.toInt()
                 if (updatedSec != elapsedSeconds) {
                     elapsedSeconds = updatedSec
                     notifyAdventureState()
                 }
-                if (blitzState == BlitzState.TIME_EXPIRED) {
-                    isEnginePaused = true
-                    onGameOver?.invoke()
-                }
-            } else if (!isClashModeActive) {
-                matchElapsedAccSec += dt
-                val updatedSec = matchElapsedAccSec.toInt()
-                if (updatedSec != elapsedSeconds) {
-                    elapsedSeconds = updatedSec
-                    notifyAdventureState()
+
+                if (phase == BlitzPhase.SESSION_COMPLETE || blitzEngine.isTimeExpired) {
+                    val isActivelyDragging = interactionHandler.dragState.isDragging
+                    if (isActivelyDragging && !hasBuzzerBeaterGraceExpired) {
+                        buzzerGraceTimer -= dt
+                        if (buzzerGraceTimer <= 0f) {
+                            hasBuzzerBeaterGraceExpired = true
+                        }
+                    }
+
+                    if (!isActivelyDragging || hasBuzzerBeaterGraceExpired) {
+                        if (blitzTerminalSequenceState.phase == BlitzTerminalPhase.RUNNING) {
+                            blitzTerminalSequenceState.phase = BlitzTerminalPhase.FREEZE_STASIS
+                            blitzTerminalSequenceState.sequenceElapsedSec = 0f
+                            isTouchLocked = true
+                            trauma = 0.55f
+                            SfxManager.playSfx(SfxType.MEGA_BLITZ)
+                        } else if (blitzTerminalSequenceState.phase == BlitzTerminalPhase.FREEZE_STASIS) {
+                            blitzTerminalSequenceState.sequenceElapsedSec += dt
+                            if (blitzTerminalSequenceState.sequenceElapsedSec >= blitzTerminalSequenceState.freezeDurationSec) {
+                                blitzTerminalSequenceState.phase = BlitzTerminalPhase.DEBRIEF_MOUNTED
+                                isEnginePaused = true
+                                onGameOver?.invoke()
+                            }
+                        }
+                    }
+                } else {
+                    buzzerGraceTimer = 0.5f
+                    hasBuzzerBeaterGraceExpired = false
+                    blitzTerminalSequenceState.phase = BlitzTerminalPhase.RUNNING
+                    blitzTerminalSequenceState.sequenceElapsedSec = 0f
                 }
             }
         }
@@ -321,20 +416,18 @@ class GridSurgeGameView @JvmOverloads constructor(
                 warpController = warpController,
                 sectorId = if (isAdventureModeActive) (adventureBoard.activeBlueprint?.sectorId ?: 1) else 1,
                 now = animationTimeMs,
-                dt = dt
+                dt = dt,
+                blitzTerminalSequenceState = blitzTerminalSequenceState,
+                activePreloaderElapsedMs = activePreloaderElapsedMs,
+                isRebootLockoutActive = isRebootLockoutActive,
+                rebootTimerSec = rebootTimerSec
             )
 
             if (isClashModeActive) {
-                clashHudRenderer.prepareDimensions(context)
-                clashHudRenderer.renderDuelHud(
-                    canvas = canvas,
-                    anchorRect = boardRect,
-                    playerScore = currentScore,
-                    rivalScore = ghostDuelEngine.rivalScore,
-                    secondsRemaining = ghostDuelEngine.matchSecondsRemaining,
-                    rivalComboActive = ghostDuelEngine.rivalCombo > 1,
-                    now = animationTimeMs
-                )
+                if (liveStartEpochMs > 0L) {
+                    ghostDuelEngine.updateLiveTimer(startEpochMs = liveStartEpochMs, totalSeconds = 90)
+                }
+                // Native canvas HUD disabled in favor of Compose OverchargeMomentumBar
             }
         } finally {
             canvas.restoreToCount(rootSaveCount)
@@ -368,7 +461,7 @@ class GridSurgeGameView @JvmOverloads constructor(
             if (slotIndex >= 0) consumePiece(slotIndex)
             handleNovaCoreExplosion(col, row)
         } else if (shape.specialType == SpecialBlockType.QUANTUM_WARP_VORTEX) {
-            SfxManager.playPlacementSound(isSpecial = true)
+            SfxManager.playSfx(SfxType.WARP_VORTEX)
             if (slotIndex >= 0) consumePiece(slotIndex)
             handleWarpBlockDetonation(col, row, shape.color)
             if (isAdventureModeActive) {
@@ -390,8 +483,22 @@ class GridSurgeGameView @JvmOverloads constructor(
             shape.offsets.forEach { offset ->
                 engine.setCellColor(col + offset.x, row + offset.y, shape.color)
             }
-            SfxManager.playPlacementSound(isSpecial = shape.specialType != SpecialBlockType.NONE)
+            SfxManager.playPlacementSound(isSpecial = shape.specialType != SpecialBlockType.NONE, skinId = activeThemeKey)
             juiceCoordinator.onPiecePlaced(placedCoords, shape.color)
+
+            // Record telemetry for replay theater
+            MatchTelemetryRecorder.logPlayerMove(
+                slotIndex = slotIndex,
+                shapeId = shape.id.hashCode(),
+                targetRow = row,
+                targetCol = col,
+                occupiedOffsets = shape.offsets.map { Pair(it.y, it.x) },
+                colorInt = shape.color,
+                linesCleared = result.totalLines,
+                scoreAfterMove = engine.score,
+                comboStreak = engine.comboManager.currentStreak
+            )
+
             if (isAdventureModeActive) {
                 relicManager?.onPiecePlaced(engine.getOccupiedRatio())
             }
@@ -414,7 +521,7 @@ class GridSurgeGameView @JvmOverloads constructor(
     override fun triggerHaptic(constant: Int) { performHapticFeedback(constant) }
     override fun isJammed(slotIndex: Int) = bossEngine.state.jammedSlotIndex == slotIndex
     override fun getFlatGrid() = IntArray(64) { if (engine.getGridValue(it % 8, it / 8) == 0) 0 else 1 }
-    override fun getHazardGrid() = if (isAdventureModeActive) progressionEngine.hazardGrid else null
+    override fun getHazardGrid() = progressionEngine.hazardGrid
     override fun isInteractionLocked() = isEnginePaused || matchPhase == MatchPhase.STAGE_COMPLETED || isObjectiveMet || isTouchLocked
     override fun getCurrentTimeMs() = animationTimeMs
 
@@ -481,7 +588,52 @@ class GridSurgeGameView @JvmOverloads constructor(
     // --- Private Helpers ---
     private fun consumePiece(idx: Int) {
         if (idx in 0..2) { dockShapes[idx] = null; engine.dock[idx] = null }
-        if (dockShapes.all { it == null }) replenishDock()
+        smartAdPacingEngine.recordPiecePlaced()
+        if (dockShapes.all { it == null }) {
+            if (isClashModeActive && livePieceStream != null) {
+                replenishLiveSeededDock()
+            } else {
+                checkSmartAdOrReplenishDock()
+            }
+        }
+    }
+
+    private fun checkSmartAdOrReplenishDock() {
+        val eligibility = smartAdPacingEngine.evaluateEligibility(
+            isNoAdsOwned = false,
+            isRankedOrPvP = isClashModeActive,
+            activeComboStreak = engine.comboManager.currentStreak,
+            isDraggingPiece = interactionHandler.dragState.isDragging
+        )
+
+        if (eligibility == AdEligibilityResult.ELIGIBLE) {
+            val activity = context as? Activity
+            if (activity != null) {
+                isTouchLocked = true
+                isEnginePaused = true
+
+                mainScope.launch {
+                    val startTime = SystemClock.elapsedRealtime()
+                    while (SystemClock.elapsedRealtime() - startTime < 1200L) {
+                        activePreloaderElapsedMs = SystemClock.elapsedRealtime() - startTime
+                        postInvalidateOnAnimation()
+                        delay(16L)
+                    }
+
+                    activePreloaderElapsedMs = 0L
+                    AdManager.showInterstitialAd(activity, false)
+                    smartAdPacingEngine.recordInterstitialShown()
+
+                    replenishDock()
+                    isTouchLocked = false
+                    isEnginePaused = false
+                    postInvalidateOnAnimation()
+                }
+                return
+            }
+        }
+
+        replenishDock()
     }
 
     private fun replenishDock() {
@@ -513,10 +665,6 @@ class GridSurgeGameView @JvmOverloads constructor(
         if (result.totalLines > 0) {
             juiceCoordinator.onLinesCleared(result, engine.comboManager.currentStreak, animationTimeMs)
             onLinesCleared?.invoke(result.totalLines)
-            
-            val cx = boardRect.centerX()
-            val cy = boardRect.centerY()
-            juiceCoordinator.spawnPopup(cx, cy, "+${result.pointsEarned}", Color.CYAN, animationTimeMs)
         }
 
         if (isAdventureModeActive) {
@@ -594,33 +742,77 @@ class GridSurgeGameView @JvmOverloads constructor(
             }
         }
 
+        // --- MISSION & DIRECTIVE PROGRESS DISPATCH ---
+        onDirectiveEvent?.invoke("dir_place_blocks", 1)
+        if (result.totalLines > 0) {
+            totalLinesInMatch += result.totalLines
+            maxComboInMatch = maxOf(maxComboInMatch, engine.comboManager.currentStreak)
+            onMissionEvent?.invoke(QuestType.LINES, result.totalLines)
+            if (result.totalLines >= 2) {
+                onDirectiveEvent?.invoke("dir_clear_lines", 1)
+            }
+            // Defuse Stasis Jammers on cleared rows or columns
+            for (r in result.clearedRows) {
+                for (c in 0..7) {
+                    if (progressionEngine.hazardGrid[r][c].hazardType == AdventureHazardType.EMP_LOCK) {
+                        progressionEngine.hazardGrid[r][c] = HazardCellState(hazardType = AdventureHazardType.NONE)
+                        val cx = boardRect.left + (c + 0.5f) * currentCellSizePx
+                        val cy = boardRect.top + (r + 0.5f) * currentCellSizePx
+                        juiceCoordinator.spawnPopup(cx, cy, "JAMMER DEFUSED!", Color.parseColor("#FFD600"), animationTimeMs)
+                        SfxManager.playSfx(SfxType.CORE_EXPLOSION)
+                    }
+                }
+            }
+            for (c in result.clearedCols) {
+                for (r in 0..7) {
+                    if (progressionEngine.hazardGrid[r][c].hazardType == AdventureHazardType.EMP_LOCK) {
+                        progressionEngine.hazardGrid[r][c] = HazardCellState(hazardType = AdventureHazardType.NONE)
+                        val cx = boardRect.left + (c + 0.5f) * currentCellSizePx
+                        val cy = boardRect.top + (r + 0.5f) * currentCellSizePx
+                        juiceCoordinator.spawnPopup(cx, cy, "JAMMER DEFUSED!", Color.parseColor("#FFD600"), animationTimeMs)
+                        SfxManager.playSfx(SfxType.CORE_EXPLOSION)
+                    }
+                }
+            }
+            val vectorEvents = mutableListOf<ClearedLineEvent>()
+            result.clearedRows.forEach { r ->
+                vectorEvents.add(ClearedLineEvent(index = r, isRow = true, colorLong = 0xFF00E5FFL, progress = 0f))
+            }
+            result.clearedCols.forEach { c ->
+                vectorEvents.add(ClearedLineEvent(index = c, isRow = false, colorLong = 0xFF00E5FFL, progress = 0f))
+            }
+            if (vectorEvents.isNotEmpty()) {
+                onVectorLineClear?.invoke(vectorEvents)
+            }
+        }
+        if (engine.comboManager.currentStreak > 1) {
+            onMissionEvent?.invoke(QuestType.COMBO, engine.comboManager.currentStreak)
+        }
+        if (isGlitchModeActive && glitchEngine.totalPurgedCount > 0) {
+            onDirectiveEvent?.invoke("dir_anomaly_seed", glitchEngine.totalPurgedCount)
+        }
+
         if (isTimeBlitzModeActive) currentScore = blitzController.processMove(result, engine.comboManager.currentStreak)
         if (isGlitchModeActive) {
             glitchController.processMove(result)
+            checkPurityState(glitchEngine.purity)
+
             val targetPurge = 25
             if (glitchEngine.totalPurgedCount >= targetPurge && !isObjectiveMet) {
                 isObjectiveMet = true
-                isEnginePaused = true
+                isTouchLocked = true
                 SfxManager.playSfx(SfxType.LEVEL_COMPLETE)
                 SfxManager.playVox(VoxAction.OBJECTIVE_DONE)
-                val evalResult = StarEvaluationResult(
-                    totalStars = 3,
-                    star1Secured = true,
-                    star2Secured = true,
-                    star3Secured = true,
-                    star1Title = "GLITCH PURGED",
-                    star2Title = "GRID CLEARED",
-                    star3Title = "TIME RECORD",
-                    star1Detail = "35/35 Catalysts Cleared",
-                    star2Detail = "Purity Target Reached",
-                    star3Detail = "Elite Reaction Speed"
-                )
-                onStageVictoryEvaluated?.invoke(
-                    1,
-                    currentScore,
-                    evalResult,
-                    elapsedSeconds
-                )
+
+                mainScope.launch {
+                    delay(650L) // Allow line clear particle explosions & beam sweeps to finish animating
+                    vfxPool.clearAll()
+                    juiceFx.clearAll()
+                    spriteVfxEngine.clearAll()
+                    scorePopupManager.clearAll()
+                    isEnginePaused = true
+                    onGameOver?.invoke()
+                }
                 return
             }
         }
@@ -635,6 +827,38 @@ class GridSurgeGameView @JvmOverloads constructor(
         currentScore = engine.score 
         if (isClashModeActive) {
             ghostDuelEngine.evaluateLead(currentScore)
+
+            // 1. Broadcast move to opponent
+            onBroadcastLiveMove?.invoke(
+                currentScore,
+                result.totalLines,
+                engine.comboManager.currentStreak,
+                blitzEngine.state.isFeverActive,
+                false
+            )
+
+            // 2. Kinetic attack volleys toward rival HUD on multi-clears
+            if (result.totalLines >= 2) {
+                renderer.clashAttackEmitter.spawnAttackVolley(
+                    originX = lastDropPxX,
+                    originY = lastDropPxY,
+                    targetX = width * 0.82f,
+                    targetY = 32f * density,
+                    lineCount = result.totalLines
+                )
+                SfxManager.playSfx(SfxType.SNAP_TICK, overridePitch = 1.5f)
+                trauma = (trauma + 0.35f).coerceAtMost(1.0f)
+            }
+
+            val currentDelta = currentScore - currentRivalScore
+            if (previousScoreDelta < 0 && currentDelta >= 0) {
+                trauma = 0.45f
+                SfxManager.playSfx(SfxType.LEVEL_COMPLETE, overridePitch = 1.6f)
+            } else if (previousScoreDelta >= 0 && currentDelta < 0) {
+                trauma = 0.35f
+                SfxManager.playSfx(SfxType.EMP_SHOCKWAVE, overridePitch = 0.85f)
+            }
+            previousScoreDelta = currentDelta
         }
         onScoreChanged?.invoke(currentScore, engine.comboManager.currentStreak)
         
@@ -644,15 +868,103 @@ class GridSurgeGameView @JvmOverloads constructor(
         checkGameOverOrVictory()
     }
 
+    fun forceRefillFreshDock() {
+        for (i in 0 until 3) {
+            dockShapes[i] = null
+            engine.dock[i] = null
+        }
+        if (livePieceStream != null) {
+            replenishLiveSeededDock()
+        } else {
+            replenishDock()
+        }
+    }
+
     private fun checkGameOverOrVictory() {
         if (isObjectiveMet) return // Already won, don't trigger Game Over
 
         if (!canAnyPieceBePlaced()) {
-            isEnginePaused = true
+            if (rebootStrikeCount == 0) {
+                // --- STRIKE 1: EMERGENCY OVERRIDE // GRID FLUSH ---
+                rebootStrikeCount = 1
+                isTouchLocked = true
+                isRebootLockoutActive = true
+                rebootTimerSec = 2.0f
+                trauma = 0.85f
+                SfxManager.playSfx(SfxType.SYSTEM_OFFLINE)
+                SfxManager.playVox(VoxAction.GRID_CRITICAL)
+
+                // 1. Deduct 20% score tax & reset combo
+                val penaltyTax = (currentScore * 0.20f).toLong()
+                currentScore = (currentScore - penaltyTax).coerceAtLeast(0L)
+                engine.score = currentScore
+                engine.comboManager.reset()
+
+                // 2. Vaporize center 4x4 core
+                engine.clearCenter4x4()
+
+                // Vector line clear disintegration effect for center 4x4
+                val flushEvents = mutableListOf<ClearedLineEvent>()
+                val orangeColor = 0xFFFF6D00L
+                for (r in 2..5) {
+                    flushEvents.add(ClearedLineEvent(index = r, isRow = true, colorLong = orangeColor, progress = 0f))
+                }
+                for (c in 2..5) {
+                    flushEvents.add(ClearedLineEvent(index = c, isRow = false, colorLong = orangeColor, progress = 0f))
+                }
+                onVectorLineClear?.invoke(flushEvents)
+
+                val taxFormatted = if (penaltyTax > 0) "-${String.format(Locale.US, "%,d", penaltyTax)}" else "0"
+                juiceCoordinator.spawnPopup(
+                    boardRect.centerX(),
+                    boardRect.centerY(),
+                    "[ $taxFormatted // EMERGENCY OVERRIDE TAX ]",
+                    Color.RED,
+                    animationTimeMs
+                )
+
+                // 3. Discard dead pieces & generate 3 fresh playable pieces
+                forceRefillFreshDock()
+
+                // 4. Start 2.0s System Reboot Timer
+                mainScope.launch {
+                    val startMs = SystemClock.uptimeMillis()
+                    while (rebootTimerSec > 0f) {
+                        delay(100L)
+                        val elapsedSec = (SystemClock.uptimeMillis() - startMs) / 1000f
+                        rebootTimerSec = (2.0f - elapsedSec).coerceAtLeast(0f)
+                        postInvalidateOnAnimation()
+                    }
+                    isRebootLockoutActive = false
+                    isTouchLocked = false
+                    postInvalidateOnAnimation()
+                }
+                return
+            }
+
+            // --- STRIKE 2: CRITICAL CORE COLLAPSE (TKO) ---
+            isTouchLocked = true
             matchTimer.stop()
             SfxManager.playSfx(SfxType.SYSTEM_OFFLINE)
             ModalOrchestrator.clearAll()
-            if (isAdventureModeActive) onStageDefeat?.invoke() else onGameOver?.invoke()
+
+            mainScope.launch {
+                delay(400L) // Allow placement VFX to complete
+                vfxPool.clearAll()
+                juiceFx.clearAll()
+                spriteVfxEngine.clearAll()
+                scorePopupManager.clearAll()
+                isEnginePaused = true
+
+                if (isClashModeActive) {
+                    onBroadcastLiveMove?.invoke(currentScore, 0, 0, false, true)
+                    ghostDuelEngine.concludeMatchWithDefeat(currentScore)
+                } else if (isAdventureModeActive) {
+                    onStageDefeat?.invoke()
+                } else {
+                    onGameOver?.invoke()
+                }
+            }
         }
     }
 
@@ -665,7 +977,7 @@ class GridSurgeGameView @JvmOverloads constructor(
             var fits = true
             for (o in offsets) {
                 val br = r + o.y; val bc = c + o.x
-                if (bc !in 0..7 || br !in 0..7 || engine.getGridValue(bc, br) != 0 || (isAdventureModeActive && progressionEngine.hazardGrid[br][bc].hazardType == AdventureHazardType.EMP_LOCK)) {
+                if (bc !in 0..7 || br !in 0..7 || engine.getGridValue(bc, br) != 0 || progressionEngine.hazardGrid[br][bc].hazardType == AdventureHazardType.EMP_LOCK) {
                     fits = false
                     break
                 }
@@ -865,35 +1177,108 @@ class GridSurgeGameView @JvmOverloads constructor(
 
     private fun notifyAdventureState() {
         val authoritativeLines = if (isAdventureModeActive) adventureBoard.linesClearedThisStage else classicController.linesClearedTotal
-        onAdventureStateUpdated?.invoke(0, currentScore, authoritativeLines, adventureBoard.totalPurgedThisStage, isObjectiveMet, adventureBoard.bossHp, elapsedSeconds, adventureBoard.activeCoresRemaining, glitchEngine.totalPurgedCount, adventureBoard.synthesisCount, adventureBoard.maxStreakReached, runState.resonanceEnergy, engine.getOccupiedRatio(), lastDropPxX, lastDropPxY)
+        val authoritativeMovesRemaining = if (isAdventureModeActive) adventureBoard.movesRemaining else movesPlayedThisStage
+        onAdventureStateUpdated?.invoke(
+            authoritativeMovesRemaining,
+            currentScore,
+            authoritativeLines,
+            adventureBoard.totalPurgedThisStage,
+            isObjectiveMet,
+            adventureBoard.bossHp,
+            elapsedSeconds,
+            adventureBoard.activeCoresRemaining,
+            glitchEngine.totalPurgedCount,
+            adventureBoard.synthesisCount,
+            adventureBoard.maxStreakReached,
+            runState.resonanceEnergy,
+            engine.getOccupiedRatio(),
+            lastDropPxX,
+            lastDropPxY
+        )
+    }
+
+    private fun checkPurityState(newPurity: Float) {
+        if (newPurity <= 0.05f && meltdownJob == null) {
+            trauma = 0.85f
+            SfxManager.playSfx(SfxType.EMP_SHOCKWAVE, overridePitch = 0.5f)
+            SfxManager.playVox(VoxAction.GRID_CRITICAL)
+
+            meltdownJob = mainScope.launch {
+                for (i in 3 downTo 1) {
+                    trauma = 0.7f
+                    delay(1000L)
+                }
+
+                if (glitchEngine.purity <= 0.05f) {
+                    isEnginePaused = true
+                    isTouchLocked = true
+                    SfxManager.playSfx(SfxType.SYSTEM_OFFLINE)
+                    onGameOver?.invoke()
+                } else {
+                    meltdownJob = null
+                }
+            }
+        }
     }
 
     private fun handleVictory(elapsedSec: Int) {
+        isTouchLocked = true
         isObjectiveMet = true
-        matchPhase = MatchPhase.STAGE_COMPLETED
         matchTimer.stop()
-        val levelNum = adventureBoard.activeBlueprint?.levelNumber ?: currentAdventureLevelNumber
-        val benchmark = AdventureSectorRegistry.getBenchmark(levelNum)
-        val telemetry = MatchTelemetrySnapshot(true, movesPlayedThisStage, elapsedSec, currentScore, engine.comboManager.currentStreak, maxSimultaneousLinesCleared, relicActivationsCountThisStage, empJamOccurredThisStage)
-        val evaluation = StarRatingEvaluator.evaluateMatch(benchmark, telemetry)
-        onStageVictoryEvaluated?.invoke(levelNum, currentScore, evaluation, elapsedSec)
+
+        mainScope.launch {
+            val unusedMoves = adventureBoard.movesRemaining
+            if (unusedMoves > 0) {
+                for (m in unusedMoves downTo 1) {
+                    delay(90L)
+                    val bonus = 250L
+                    currentScore += bonus
+                    engine.score = currentScore
+                    adventureBoard.movesRemaining = m - 1
+                    notifyAdventureState()
+
+                    trauma = 0.35f
+                    SfxManager.playSfx(SfxType.SNAP_TICK, overridePitch = 1.0f + (unusedMoves - m) * 0.05f)
+                    juiceCoordinator.spawnPopup(
+                        boardRect.centerX(), boardRect.centerY(),
+                        "+$bonus OVERDRIVE", Color.parseColor("#00FF66"), animationTimeMs
+                    )
+                }
+                delay(400L)
+            }
+
+            isTouchLocked = false
+            matchPhase = MatchPhase.STAGE_COMPLETED
+            val levelNum = adventureBoard.activeBlueprint?.levelNumber ?: currentAdventureLevelNumber
+            val benchmark = AdventureSectorRegistry.getBenchmark(levelNum)
+            val telemetry = MatchTelemetrySnapshot(
+                true, movesPlayedThisStage, elapsedSec, currentScore,
+                engine.comboManager.currentStreak, maxSimultaneousLinesCleared,
+                relicActivationsCountThisStage, empJamOccurredThisStage
+            )
+            val evaluation = StarRatingEvaluator.evaluateMatch(benchmark, telemetry)
+            onStageVictoryEvaluated?.invoke(levelNum, currentScore, evaluation, elapsedSec)
+        }
     }
 
     private fun handleDuelFinished(w: Boolean, p: Long, r: Long) {
         isTouchLocked = true
         isEnginePaused = true
-        val replay = MatchReplayData(
-            matchId = "CLASH_${System.currentTimeMillis()}",
-            matchSeed = ghostDuelEngine.matchSeed,
-            gameMode = "BLITZ_CLASH",
-            matchDurationSec = 75,
+        val replay = MatchTelemetryRecorder.finishSession(
             finalPlayerScore = p,
             finalRivalScore = r,
-            isVictory = w,
-            playerMoves = emptyList(),
-            rivalMoves = emptyList()
+            matchDurationSec = 75
         )
-        onClashFinished?.invoke(w, p, r, 0, 0, 0, replay)
+        onClashFinished?.invoke(
+            w,
+            p,
+            r,
+            if (w) 50 else 15,
+            maxComboInMatch,
+            totalLinesInMatch,
+            rebootStrikeCount,
+            replay
+        )
     }
 
     private fun handleDuelTimer(t: Int) {
@@ -905,15 +1290,72 @@ class GridSurgeGameView @JvmOverloads constructor(
         }
     }
 
-    private fun triggerClashJammer(s: Int) {
-        empJamOccurredThisStage = true
-        SfxManager.playSfx(SfxType.EMP_SHOCKWAVE)
-        juiceCoordinator.spawnPopup(boardRect.centerX(), boardRect.centerY(), "STASIS JAMMED!", Color.RED, animationTimeMs)
+    fun hasActiveClashJammer(): Boolean {
+        for (r in 0..7) {
+            for (c in 0..7) {
+                if (progressionEngine.hazardGrid[r][c].hazardType == AdventureHazardType.EMP_LOCK) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
-    private fun logRivalMove(s: Long, c: Int) {}
+    fun applyClashJammerToBoard() {
+        // MAX 1 ACTIVE JAMMER RULE: If an EMP Lock Jammer is already active on the board, skip spawning additional Jammers
+        if (hasActiveClashJammer()) return
 
-    fun resumeEngine() { isEnginePaused = false; matchTimer.resume(); postInvalidateOnAnimation() }
+        empJamOccurredThisStage = true
+
+        val emptyCells = mutableListOf<Pair<Int, Int>>()
+        for (r in 0..7) {
+            for (c in 0..7) {
+                if (engine.getGridValue(c, r) == 0 &&
+                    progressionEngine.hazardGrid[r][c].hazardType == AdventureHazardType.NONE) {
+                    emptyCells.add(Pair(c, r))
+                }
+            }
+        }
+
+        if (emptyCells.isNotEmpty()) {
+            val (jamCol, jamRow) = emptyCells.random()
+            progressionEngine.hazardGrid[jamRow][jamCol] = HazardCellState(hazardType = AdventureHazardType.EMP_LOCK)
+
+            SfxManager.playSfx(SfxType.EMP_SHOCKWAVE)
+            SfxManager.playSfx(SfxType.STASIS_FIELD)
+            trauma = 0.65f
+
+            val jamPxX = boardRect.left + (jamCol + 0.5f) * currentCellSizePx
+            val jamPxY = boardRect.top + (jamRow + 0.5f) * currentCellSizePx
+            juiceCoordinator.spawnPopup(jamPxX, jamPxY, "STASIS JAMMED!", Color.RED, animationTimeMs)
+        }
+    }
+
+    private fun triggerClashJammer(s: Int) {
+        applyClashJammerToBoard()
+    }
+
+    private fun logRivalMove(s: Long, c: Int) {
+        MatchTelemetryRecorder.logRivalMove(
+            slotIndex = 0,
+            shapeId = 1,
+            targetRow = 0,
+            targetCol = 0,
+            occupiedOffsets = emptyList(),
+            colorInt = Color.RED,
+            linesCleared = 0,
+            scoreAfterMove = s,
+            comboStreak = c
+        )
+    }
+
+    fun resumeEngine() {
+        isEnginePaused = false
+        lastFrameTime = System.nanoTime()
+        lastRealTimeMs = SystemClock.uptimeMillis()
+        matchTimer.resume()
+        postInvalidateOnAnimation()
+    }
     fun pauseEngine() { isEnginePaused = true; matchTimer.pause(); invalidate() }
     fun setTheme(t: String) { activeThemeKey = ThemeNormalizer.normalize(t) }
     
@@ -946,7 +1388,11 @@ class GridSurgeGameView @JvmOverloads constructor(
             reset()
         }
 
+        matchTimer.reset()
         matchTimer.start()
+        matchElapsedAccSec = 0f
+        elapsedSeconds = 0
+        notifyAdventureState()
         replenishDock()
         postInvalidateOnAnimation()
     }
@@ -969,6 +1415,7 @@ class GridSurgeGameView @JvmOverloads constructor(
         currentAdventureLevelNumber = blueprint.levelNumber
         movesPlayedThisStage = 0
         currentScore = 0L
+        matchElapsedAccSec = 0f
         elapsedSeconds = 0
         maxSimultaneousLinesCleared = 0
         relicActivationsCountThisStage = 0
@@ -998,6 +1445,7 @@ class GridSurgeGameView @JvmOverloads constructor(
         // 4. Start Timer & Populate Fresh Trays
         matchTimer.reset()
         matchTimer.start()
+        notifyAdventureState()
         replenishDock()
         
         isEnginePaused = false
@@ -1022,8 +1470,12 @@ class GridSurgeGameView @JvmOverloads constructor(
         hasUsedReviveThisRun = false
         matchPhase = MatchPhase.IN_PROGRESS
 
+        val seed = System.currentTimeMillis()
+        MatchTelemetryRecorder.startSession(seed, "CLASSIC")
+
         currentScore = 0L
         movesPlayedThisStage = 0
+        matchElapsedAccSec = 0f
         elapsedSeconds = 0
         engine.resetGame()
         vfxPool.clearAll()
@@ -1035,6 +1487,7 @@ class GridSurgeGameView @JvmOverloads constructor(
 
         matchTimer.reset()
         matchTimer.start()
+        notifyAdventureState()
 
         replenishDock()
         postInvalidateOnAnimation()
@@ -1051,13 +1504,22 @@ class GridSurgeGameView @JvmOverloads constructor(
         isObjectiveMet = false
         hasUsedReviveThisRun = false
 
+        val seed = System.currentTimeMillis()
+        MatchTelemetryRecorder.startSession(seed, "TIME_BLITZ")
+
+        lastFrameTime = System.nanoTime()
+        lastRealTimeMs = SystemClock.uptimeMillis()
+
         currentScore = 0L
         movesPlayedThisStage = 0
+        matchElapsedAccSec = 0f
+        elapsedSeconds = 90
         engine.resetGame()
         blitzController.reset()
         vfxPool.clearAll()
         juiceFx.clearAll()
         spriteVfxEngine.clearAll()
+        notifyAdventureState()
         replenishDock()
         postInvalidateOnAnimation()
     }
@@ -1073,19 +1535,29 @@ class GridSurgeGameView @JvmOverloads constructor(
         isObjectiveMet = false
         hasUsedReviveThisRun = false
 
+        val seed = System.currentTimeMillis()
+        MatchTelemetryRecorder.startSession(seed, "DAILY_GLITCH")
+
         currentScore = 0L
         movesPlayedThisStage = 0
+        matchElapsedAccSec = 0f
+        elapsedSeconds = 0
         engine.resetGame()
         glitchController.spawner.reset()
         vfxPool.clearAll()
         juiceFx.clearAll()
         spriteVfxEngine.clearAll()
+        matchTimer.reset()
+        matchTimer.start()
+        notifyAdventureState()
         replenishDock()
         postInvalidateOnAnimation()
     }
 
     fun deployEmpSurgeRevive() {
         hasUsedReviveThisRun = true
+        isTouchLocked = false
+        isEnginePaused = false
         if (isAdventureModeActive) {
             for (r in 2..5) {
                 for (c in 2..5) {
@@ -1107,9 +1579,10 @@ class GridSurgeGameView @JvmOverloads constructor(
             val freshTray = classicController.executeEmpRevive()
             for (i in 0..2) {
                 dockShapes[i] = freshTray.getOrNull(i)
+                engine.dock[i] = dockShapes[i]
             }
+            syncDockFromEngine()
         }
-        isEnginePaused = false
         matchTimer.resume()
         postInvalidateOnAnimation()
     }
@@ -1149,11 +1622,170 @@ class GridSurgeGameView @JvmOverloads constructor(
         scorePopupManager.clearAll()
 
         val seed = System.currentTimeMillis()
+        MatchTelemetryRecorder.startSession(seed, "BLITZ_CLASH")
         ghostDuelEngine.reset()
         ghostDuelEngine.startDuel(seed, rivalReplay)
 
         replenishDock()
         postInvalidateOnAnimation()
+    }
+
+    private var livePieceStream: DeterministicPieceStream? = null
+
+    /**
+     * STEP 1: Pre-populates the board and tray in RAM while the countdown modal is STILL SHOWN.
+     * Eliminates the 5-10 second empty tray lag entirely.
+     */
+    fun prepareLiveClashDuel(
+        sharedSeed: Long,
+        startEpochMs: Long = 0L,
+        totalSeconds: Int = 90
+    ) {
+        ModalOrchestrator.clearAll()
+        isClashModeActive = true
+        isAdventureModeActive = false
+        isGlitchModeActive = false
+        isTimeBlitzModeActive = false
+
+        // Hold engine in stasis until countdown finishes
+        isEnginePaused = true
+        isTouchLocked = true
+        isObjectiveMet = false
+        hasUsedReviveThisRun = false
+        matchPhase = MatchPhase.IN_PROGRESS
+
+        currentScore = 0L
+        movesPlayedThisStage = 0
+        elapsedSeconds = totalSeconds
+        liveStartEpochMs = startEpochMs
+
+        // SAFE: Zero-argument reset
+        ghostDuelEngine.reset()
+
+        // Wipe previous game state & hazards
+        engine.resetGame()
+        progressionEngine.clearHazards()
+        rebootStrikeCount = 0
+        maxComboInMatch = 1
+        totalLinesInMatch = 0
+        vfxPool.clearAll()
+        juiceFx.clearAll()
+        spriteVfxEngine.clearAll()
+        scorePopupManager.clearAll()
+
+        // Start Telemetry Recording Session for Live Match Replay
+        MatchTelemetryRecorder.startSession(sharedSeed, "BLITZ_CLASH")
+
+        // Initialize Deterministic Stream with Server Seed
+        livePieceStream = DeterministicPieceStream(sharedSeed)
+
+        // PRE-POPULATE DOCK PIECES IMMEDIATELY
+        replenishLiveSeededDock()
+
+        // Force immediate layout invalidation so pieces are ready on GPU
+        invalidate()
+    }
+
+    /**
+     * STEP 2: Launches the live clock and unlocks touch the exact millisecond countdown hits 0.
+     */
+    fun launchLiveClashDuel(
+        sharedSeed: Long,
+        startEpochMs: Long = System.currentTimeMillis(),
+        totalSeconds: Int = 90
+    ) {
+        liveStartEpochMs = startEpochMs
+        ghostDuelEngine.reset()
+        ghostDuelEngine.startLiveDuel(seed = sharedSeed, startEpochMs = startEpochMs, totalSeconds = totalSeconds)
+
+        // Unlock board for active combat
+        isTouchLocked = false
+        isEnginePaused = false
+        lastFrameTime = System.nanoTime()
+        lastRealTimeMs = SystemClock.uptimeMillis()
+
+        postInvalidateOnAnimation()
+    }
+
+    /**
+     * Starts an authoritative LIVE 1v1 Clash Match against a real player.
+     */
+    fun startLiveClashDuel(
+        sharedSeed: Long,
+        matchDurationSec: Int = 90
+    ) {
+        prepareLiveClashDuel(sharedSeed = sharedSeed, totalSeconds = matchDurationSec)
+        launchLiveClashDuel(sharedSeed, totalSeconds = matchDurationSec)
+    }
+
+    /**
+     * Ingests live telemetry broadcast from opponent's device.
+     */
+    fun onRemoteCombatTelemetryReceived(
+        remoteScore: Long,
+        remoteLines: Int,
+        remoteCombo: Int,
+        isFever: Boolean,
+        isTko: Boolean
+    ) {
+        ghostDuelEngine.onLiveRivalTelemetryReceived(remoteScore, remoteLines, remoteCombo, isFever, isTko)
+
+        // Record live rival move in replay recorder
+        MatchTelemetryRecorder.logRivalMove(
+            slotIndex = 0,
+            shapeId = 1,
+            targetRow = 0,
+            targetCol = 0,
+            occupiedOffsets = emptyList(),
+            colorInt = Color.RED,
+            linesCleared = remoteLines,
+            scoreAfterMove = remoteScore,
+            comboStreak = remoteCombo
+        )
+
+        if (remoteLines >= 2) {
+            val rivalHudX = width * 0.82f
+            val rivalHudY = 32f * density
+            renderer.clashAttackEmitter.spawnAttackVolley(
+                originX = rivalHudX,
+                originY = rivalHudY,
+                targetX = boardRect.centerX(),
+                targetY = boardRect.centerY(),
+                lineCount = remoteLines
+            )
+            trauma = (trauma + 0.40f).coerceAtMost(1.0f)
+            SfxManager.playSfx(SfxType.SNAP_TICK, overridePitch = 0.8f)
+        }
+
+        if (remoteLines >= 4 || remoteCombo >= 5) {
+            applyClashJammerToBoard()
+        }
+
+        if (isTko) {
+            isTouchLocked = true
+            isEnginePaused = true
+            SfxManager.playSfx(SfxType.LEVEL_COMPLETE, overridePitch = 1.3f)
+            ghostDuelEngine.concludeMatchWithVictory(currentScore)
+        }
+
+        postInvalidateOnAnimation()
+    }
+
+    /**
+     * Deterministically populates the dock from the shared PRNG seed.
+     */
+    private fun replenishLiveSeededDock() {
+        val stream = livePieceStream ?: run {
+            replenishDock()
+            return
+        }
+
+        val trio = stream.nextTrayTrioShapes()
+        for (i in 0 until 3) {
+            dockShapes[i] = trio[i]
+            engine.dock[i] = trio[i]
+        }
+        syncDockFromEngine()
     }
     
     fun executeRelicCyberWareAbility(a: RelicAbilityType) {

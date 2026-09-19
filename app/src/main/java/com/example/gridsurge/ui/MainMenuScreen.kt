@@ -1,61 +1,94 @@
 package com.example.gridsurge.ui
 
+import android.app.Activity
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.*
+import com.example.gridsurge.ads.AdManager
+import com.example.gridsurge.monetization.engine.FirewallJammerManager
+import com.example.gridsurge.ui.hub.components.FirewallJammerCard
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.cos
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gridsurge.R
-import com.example.gridsurge.audio.*
-import com.example.gridsurge.meta.PlayerProfileManager
-import com.example.gridsurge.meta.ThemeCatalog
-import com.example.gridsurge.meta.data.DailyLoginRepository
-import com.example.gridsurge.settings.SettingsManager
 import com.example.gridsurge.armory.data.ArmoryDataStoreRepository
-import com.example.gridsurge.ui.components.GridSurgeHeroLogo
+import com.example.gridsurge.audio.BgmManager
+import com.example.gridsurge.audio.BgmTrack
+import com.example.gridsurge.audio.SfxManager
+import com.example.gridsurge.audio.SfxType
+import com.example.gridsurge.game.glitch.DailyGlitchCountdownManager
+import com.example.gridsurge.game.glitch.DailyGlitchTier
+import com.example.gridsurge.game.glitch.DailyGlitchUiState
+import com.example.gridsurge.game.glitch.DailyLeaderboardEntry
+import com.example.gridsurge.hub.model.GameMode
+import com.example.gridsurge.hub.model.ModeTelemetry
+import com.example.gridsurge.meta.PlayerProfileManager
+import com.example.gridsurge.meta.data.DailyLoginRepository
+import com.example.gridsurge.meta.data.DailyMissionsRepository
+import kotlinx.coroutines.flow.flowOf
+import com.example.gridsurge.settings.SettingsManager
 import com.example.gridsurge.ui.components.StarVaultPill
-import com.example.gridsurge.ui.settings.SettingsDialog
-import com.example.gridsurge.game.glitch.*
-import com.example.gridsurge.ui.glitch.DailyGlitchEntryDialog
-import com.example.gridsurge.ui.screens.DailyLoginDialog
-import com.example.gridsurge.ui.screens.UPLINK_REWARDS
+import com.example.gridsurge.ui.components.SubspaceStarfield
 import com.example.gridsurge.ui.dialogs.CyberAvatarRegistry
 import com.example.gridsurge.ui.dialogs.CyberProfileSetupDialog
-import com.example.gridsurge.ui.dialogs.ModeSelectionCatalog
-import com.example.gridsurge.ui.dialogs.ModeSelectionDrawer
+import com.example.gridsurge.ui.glitch.DailyGlitchEntryDialog
 import com.example.gridsurge.ui.modifiers.cyberBorderGlow
+import com.example.gridsurge.ui.screens.DailyLoginDialog
+import com.example.gridsurge.ui.settings.SettingsDialog
+import com.example.gridsurge.ui.theme.ChakraPetchFontFamily
+import com.example.gridsurge.ui.theme.OrbitronFontFamily
 import kotlinx.coroutines.launch
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.sin
+import kotlin.random.Random
 
 @Composable
 fun MainMenuScreen(
     profileManager: PlayerProfileManager,
     armoryRepository: ArmoryDataStoreRepository,
     dailyLoginRepository: DailyLoginRepository,
+    dailyMissionsRepository: DailyMissionsRepository? = null,
     onNavigate: (Screen) -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val claimableMissionsCount by remember(dailyMissionsRepository) {
+        dailyMissionsRepository?.getClaimableMissionsCount() ?: flowOf(0)
+    }.collectAsState(initial = 0)
+
     val dailyLoginState by dailyLoginRepository.loginStateFlow.collectAsState(initial = null)
     var showDailyLoginDialog by remember { mutableStateOf(false) }
 
@@ -66,22 +99,65 @@ fun MainMenuScreen(
     }
 
     val stars by profileManager.starCurrency.collectAsState()
-    val rawEquippedSkinId by profileManager.equippedBlockSkinId.collectAsState()
-    val equippedTheme = remember(rawEquippedSkinId) { ThemeCatalog.getThemeById(rawEquippedSkinId) }
-
     val callsign by profileManager.callsign.collectAsState()
     val avatarKey by profileManager.avatarKey.collectAsState()
     val activeAvatar = CyberAvatarRegistry.getPresetById(avatarKey)
 
-    var selectedModeIndex by remember { mutableIntStateOf(0) }
-    val currentModeSpec = ModeSelectionCatalog.ALL_MODES[selectedModeIndex]
+    val favModeKey by profileManager.favoriteMode.collectAsState()
+    val lastModeKey by profileManager.lastPlayedMode.collectAsState()
+    val startModeKey = favModeKey.ifBlank { lastModeKey }
+
+    val modes = remember { GameMode.entries }
+    val startModeIndex = remember(startModeKey) {
+        val idx = modes.indexOfFirst { it.name == startModeKey }
+        if (idx >= 0) idx else 0
+    }
+
+    val totalLoopCount = 10_000
+    val initialPage = remember(startModeIndex) {
+        (totalLoopCount / 2) * modes.size + startModeIndex
+    }
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { totalLoopCount * modes.size })
+
+    // Acoustic detent on carousel page change
+    var lastSettledPage by remember { mutableIntStateOf(pagerState.settledPage) }
+    LaunchedEffect(pagerState.settledPage) {
+        if (pagerState.settledPage != lastSettledPage) {
+            SfxManager.playSfx(SfxType.CAROUSEL_SWIPE, volume = 0.5f)
+            lastSettledPage = pagerState.settledPage
+        }
+    }
+
+    val userHighScore by profileManager.highScore.collectAsState()
+    val userTotalRuns by profileManager.totalRuns.collectAsState()
+    val userGlitchScore by profileManager.glitchBestScore.collectAsState()
+    val userBlitzScore by profileManager.blitzHighScore.collectAsState()
+    val userRatingPoints by profileManager.ratingPoints.collectAsState()
+
+    // Telemetry mapping
+    val telemetryMap = remember(userHighScore, userTotalRuns, userGlitchScore, userBlitzScore, userRatingPoints) {
+        mapOf(
+            GameMode.CLASSIC to ModeTelemetry(userHighScore.toLong(), "SORTIES", userTotalRuns.toString()),
+            GameMode.CAMPAIGN to ModeTelemetry(0L, "NODES PURGED", "0/45"),
+            GameMode.DAILY_GLITCH to ModeTelemetry(userGlitchScore, "CYCLE RESET", "24H"),
+            GameMode.TIME_BLITZ to ModeTelemetry(userBlitzScore, "TOP SCORE", String.format(Locale.US, "%,d", userBlitzScore)),
+            GameMode.BLITZ_CLASH to ModeTelemetry(userRatingPoints.toLong(), "PVP RATING", "$userRatingPoints MMR")
+        )
+    }
+
+    // Dynamic Chromatic Horizon Blending
+    val currentPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
+    val activeAccentColor = remember(currentPosition) {
+        val baseIndex = Math.floorMod(currentPosition.toInt(), modes.size)
+        val nextIndex = Math.floorMod(baseIndex + 1, modes.size)
+        val fraction = (currentPosition - currentPosition.toInt()).coerceIn(0f, 1f)
+        lerp(modes[baseIndex].primaryColor, modes[nextIndex].primaryColor, fraction)
+    }
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDailyGlitchDialog by remember { mutableStateOf(false) }
     var showProfileEditModal by remember { mutableStateOf(false) }
-    var showModeSelectionDrawer by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
     LaunchedEffect(Unit) {
         BgmManager.playTrack(context, BgmTrack.MAIN_HUB)
     }
@@ -89,152 +165,125 @@ fun MainMenuScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0C14))
+            .background(Color(0xFF040711))
     ) {
-        // Ambient Neon Grid Horizon (Animated Perspective Grid)
-        val infiniteTransition = rememberInfiniteTransition(label = "gridScroll")
-        val gridOffset by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(8000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "offset"
-        )
-
+        // 1. Dynamic Chromatic Horizon Glow & Grid
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val horizonY = h * 0.45f
-            
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        activeAccentColor.copy(alpha = 0.14f),
+                        Color.Transparent
+                    ),
+                    center = Offset(w / 2f, h * 0.42f),
+                    radius = w * 0.95f
+                ),
+                center = Offset(w / 2f, h * 0.42f),
+                radius = w * 0.95f
+            )
+
+            // Perspective Grid Wireframe
             val lines = 12
             for (i in 0..lines) {
-                val startX = w / 2f
-                val startY = horizonY
-                val endX = (w / lines) * i
-                val endY = h
+                val y = (h / lines) * i
                 drawLine(
-                    color = Color(0x1A00E5FF),
-                    start = Offset(startX, startY),
-                    end = Offset(endX, endY),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
-
-            val horizontalLines = 8
-            for (i in 0..horizontalLines) {
-                val t = (i.toFloat() / horizontalLines + gridOffset) % 1f
-                val lineY = horizonY + (h - horizonY) * (t * t)
-                drawLine(
-                    color = Color(0x1A00E5FF),
-                    start = Offset(0f, lineY),
-                    end = Offset(w, lineY),
-                    strokeWidth = 1.dp.toPx()
+                    color = activeAccentColor.copy(alpha = 0.025f),
+                    start = Offset(0f, y),
+                    end = Offset(w, y),
+                    strokeWidth = 1f
                 )
             }
         }
 
-        Image(
-            painter = painterResource(id = R.drawable.bg_main_hub),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+        // 2. Subspace Starfield Particle Warp
+        SubspaceStarfield(
+            pagerOffset = currentPosition,
+            accentColor = activeAccentColor
         )
 
+        // 3. Cyber Atmospheric Particle Motes
+        AmbientCyberMotes(accentColor = activeAccentColor)
+
+        // Vignette Scrim
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x660A0C14))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0x9905070E), Color(0x3305070E), Color(0xF205070E))
+                    )
+                )
         )
 
-        // Main UI Layout (The Cyber Command Deck)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Zone 1: Status Header Bar (Icon-Only Actions, No Text Wrapping)
+            // ==================== 1. TOP COMMAND TELEMETRY ====================
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: Operative Profile Pill
+                // Operative Dossier Capsule
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xCC141926))
-                        .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(10.dp))
+                        .background(Color(0xCC0D1424))
+                        .border(1.dp, activeAccentColor.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
                         .clickable {
                             SfxManager.playSfx(SfxType.UI_CONFIRM)
                             showProfileEditModal = true
                         }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Image(
                         painter = painterResource(id = activeAvatar.iconRes),
                         contentDescription = callsign,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
                     )
-                    Text(callsign, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text = callsign,
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = OrbitronFontFamily,
+                        letterSpacing = 0.5.sp
+                    )
                 }
 
-                // Center: Star Vault Pill
-                StarVaultPill(
-                    stars = stars,
-                    onClick = { 
-                        SfxManager.playSfx(SfxType.UI_CONFIRM)
-                        onNavigate(Screen.STORE) 
-                    }
-                )
+                // Currency & Settings Controls
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StarVaultPill(
+                        stars = stars,
+                        onClick = {
+                            SfxManager.playSfx(SfxType.UI_CONFIRM)
+                            onNavigate(Screen.STORE)
+                        }
+                    )
 
-                // Right: Clean 40x40 Icon Buttons (Quests & Settings)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Quests Icon Button
                     Box(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xCC141926))
-                            .border(1.dp, Color(0xFF26334D), RoundedCornerShape(10.dp))
-                            .clickable {
-                                SfxManager.playSfx(SfxType.UI_CONFIRM)
-                                onNavigate(Screen.QUESTS)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Assignment,
-                            contentDescription = "Quests",
-                            tint = Color(0xFF00E5FF),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFFFB300))
-                        )
-                    }
-
-                    // Settings Icon Button
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xCC141926))
-                            .border(1.dp, Color(0xFF26334D), RoundedCornerShape(10.dp))
+                            .background(Color(0xCC0D1424))
+                            .border(1.dp, Color(0xFF1E2D44), RoundedCornerShape(10.dp))
                             .clickable {
                                 SfxManager.playSfx(SfxType.UI_CONFIRM)
                                 showSettingsDialog = true
@@ -244,284 +293,188 @@ fun MainMenuScreen(
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = Color(0xFF8A99AD),
-                            modifier = Modifier.size(20.dp)
+                            tint = Color(0xFF8FA3BF),
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
             }
 
-            // Zone 2: Action & Hero Centerpiece
+            // ==================== 2. HERO TITLE & TACTICAL PIPS ====================
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .padding(vertical = 2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Hero Logo (Moved higher)
-                GridSurgeHeroLogo(
-                    modifier = Modifier.offset(y = (-24).dp)
+                Text(
+                    text = "GRID SURGE",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontFamily = OrbitronFontFamily,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 3.sp
+                )
+                Text(
+                    text = "QUANTUM PUZZLE PROTOCOL // SELECT VECTOR",
+                    color = activeAccentColor,
+                    fontSize = 8.sp,
+                    fontFamily = ChakraPetchFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp
                 )
 
-                // Mode Hero Card (With Inline < > Cycle Arrows & Tap To Select)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .cyberBorderGlow(
-                            colors = listOf(currentModeSpec.accentColor, Color.Transparent),
-                            cornerRadius = 18.dp
-                        )
-                        .clip(CyberChamferShape)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0xF00D1526), Color(0xFE060A14))
-                            )
-                        )
-                        .border(1.5.dp, currentModeSpec.accentColor, CyberChamferShape)
-                        .clickable {
-                            SfxManager.playSfx(SfxType.UI_CONFIRM)
-                            showModeSelectionDrawer = true
+                // Tactical Segmented Pager Pips
+                TacticalPagerPips(
+                    pageCount = modes.size,
+                    currentPage = Math.floorMod(pagerState.currentPage, modes.size),
+                    accentColor = activeAccentColor,
+                    onSelectPage = { targetPageIndex ->
+                        scope.launch {
+                            val currentBase = (pagerState.currentPage / modes.size) * modes.size
+                            pagerState.animateScrollToPage(currentBase + targetPageIndex)
                         }
-                        .padding(18.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Left Arrow <
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x33141926))
-                                .border(1.dp, currentModeSpec.accentColor.copy(alpha = 0.5f), CircleShape)
-                                .clickable {
-                                    SfxManager.playSfx(SfxType.SNAP_TICK)
-                                    selectedModeIndex = if (selectedModeIndex > 0) selectedModeIndex - 1 else ModeSelectionCatalog.ALL_MODES.size - 1
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("‹", color = currentModeSpec.accentColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        // Center Mode Info
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = currentModeSpec.category,
-                                color = currentModeSpec.accentColor,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp
-                            )
-                            Text(
-                                text = currentModeSpec.title,
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = currentModeSpec.subtitle,
-                                color = Color(0xFF90A4AE),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0x2200E5FF))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "[ TAP TO CHANGE MODE ]",
-                                    color = Color(0xFF00E5FF),
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // Right Arrow >
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x33141926))
-                                .border(1.dp, currentModeSpec.accentColor.copy(alpha = 0.5f), CircleShape)
-                                .clickable {
-                                    SfxManager.playSfx(SfxType.SNAP_TICK)
-                                    selectedModeIndex = (selectedModeIndex + 1) % ModeSelectionCatalog.ALL_MODES.size
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("›", color = currentModeSpec.accentColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Live-Ops Event Marquee Ribbon
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color(0x3300E676), Color(0x3300E5FF))
-                            )
-                        )
-                        .border(1.dp, Color(0x8800E676), RoundedCornerShape(10.dp))
-                        .clickable {
-                            SfxManager.playSfx(SfxType.UI_CONFIRM)
-                            selectedModeIndex = 2 // Daily Glitch
-                            showDailyGlitchDialog = true
-                        }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "⚡ LIVE: DAILY GLITCH (Resets in 18h) • 500★ REWARD",
-                        color = Color(0xFF00E676),
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Dominant PLAY NOW Action Anchor (Matching active mode theme color)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp)
-                        .cyberBorderGlow(
-                            colors = listOf(currentModeSpec.accentColor, currentModeSpec.accentColor.copy(alpha = 0.5f)),
-                            cornerRadius = 14.dp
-                        )
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(currentModeSpec.accentColor, currentModeSpec.accentColor.copy(alpha = 0.75f))
-                            )
-                        )
-                        .clickable {
-                            SfxManager.playSfx(SfxType.LEVEL_COMPLETE)
-                            if (currentModeSpec.screen == Screen.DAILY_GLITCH) {
-                                showDailyGlitchDialog = true
-                            } else {
-                                onNavigate(currentModeSpec.screen)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "▶ START MATCH",
-                        color = Color(0xFF040812),
-                        fontSize = 18.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp
-                    )
-                }
+                    },
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
-            // Zone 3: Persistent 3-Tab Meta Navigation Dock (Armory | Achievements | Leaderboards)
-            Row(
+            // ==================== 3. 3D CYLINDRICAL MODE CAROUSEL ====================
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .weight(1f),
+                contentAlignment = Alignment.Center
             ) {
-                // Dock Tab 1: Armory
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xCC141926))
-                        .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(12.dp))
-                        .clickable {
-                            SfxManager.playSfx(SfxType.UI_CONFIRM)
-                            onNavigate(Screen.ARMORY)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                val density = LocalDensity.current.density
+                HorizontalPager(
+                    state = pagerState,
+                    contentPadding = PaddingValues(horizontal = 38.dp),
+                    pageSpacing = 12.dp,
+                    modifier = Modifier.fillMaxSize()
+                ) { pageIndex ->
+                    val actualIndex = Math.floorMod(pageIndex, modes.size)
+                    val mode = modes[actualIndex]
+                    val telemetry = telemetryMap[mode] ?: ModeTelemetry(0L, "--", "--")
+
+                    // Real-Time 3D Projection Math
+                    val pageOffset = (pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction
+                    val absOffset = abs(pageOffset)
+
+                    val cardScale = (1.0f - (absOffset * 0.12f)).coerceIn(0.88f, 1.0f)
+                    val cardAlpha = (1.0f - (absOffset * 0.45f)).coerceIn(0.40f, 1.0f)
+                    val cardRotationY = (-pageOffset * 15f).coerceIn(-20f, 20f)
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = cardScale
+                                scaleY = cardScale
+                                alpha = cardAlpha
+                                rotationY = cardRotationY
+                                cameraDistance = 12f * density
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            painter = painterResource(id = equippedTheme.blockSkinRes),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                        TacticalModeCard(
+                            mode = mode,
+                            telemetry = telemetry,
+                            pageOffset = pageOffset,
+                            isFavorite = favModeKey == mode.name,
+                            onToggleFavorite = {
+                                SfxManager.playSfx(SfxType.STAR_TOGGLE)
+                                profileManager.setFavoriteMode(mode.name)
+                            },
+                            onInitiate = {
+                                SfxManager.playSfx(SfxType.MODE_LOCK_IN)
+                                profileManager.recordLastPlayedMode(mode.name)
+                                if (mode == GameMode.DAILY_GLITCH) {
+                                    showDailyGlitchDialog = true
+                                } else {
+                                    onNavigate(mode.targetScreen)
+                                }
+                            }
                         )
-                        Text("ARMORY", color = Color(0xFF00E5FF), fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                     }
                 }
+            }
 
-                // Dock Tab 2: Achievements
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xCC141926))
-                        .border(1.dp, Color(0xFFFFD700), RoundedCornerShape(12.dp))
-                        .clickable {
-                            SfxManager.playSfx(SfxType.UI_CONFIRM)
-                            onNavigate(Screen.ACHIEVEMENTS)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🏆 REWARDS", color = Color(0xFFFFD700), fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                }
+            // ==================== 3.5. FIREWALL JAMMER SHIELD CARD ====================
+            val jammerManager = remember(context) { FirewallJammerManager(context) }
+            val jammerState by jammerManager.jammerState.collectAsState()
 
-                // Dock Tab 3: Leaderboards
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xCC141926))
-                        .border(1.dp, Color(0xFFFF0055), RoundedCornerShape(12.dp))
-                        .clickable {
-                            SfxManager.playSfx(SfxType.UI_CONFIRM)
-                            onNavigate(Screen.LEADERBOARD)
-                        },
-                    contentAlignment = Alignment.Center
+            FirewallJammerCard(
+                state = jammerState,
+                onWatchAdToExtend = {
+                    val activity = context as? Activity ?: return@FirewallJammerCard
+                    AdManager.showRewardedAd(
+                        activity = activity,
+                        isNoAdsPurchased = profileManager.isNoAdsPurchased.value,
+                        onRewardEarned = {
+                            jammerManager.stackJammerTime()
+                            SfxManager.playSfx(SfxType.LEVEL_COMPLETE, overridePitch = 1.4f)
+                        }
+                    )
+                },
+                onVipUpgradeClick = {
+                    onNavigate(Screen.STORE)
+                },
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            // ==================== 4. UNIFIED META NAVIGATION DOCK ====================
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xCC0A101C))
+                    .border(1.dp, Color(0xFF1B2A40), RoundedCornerShape(14.dp))
+                    .padding(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("📊 RANKS", color = Color(0xFFFF0055), fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                    DockTabItem(
+                        label = "ARMORY",
+                        iconRes = R.drawable.ic_dock_armory,
+                        accentColor = Color(0xFF00E5FF),
+                        onClick = { onNavigate(Screen.ARMORY) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    DockTabItem(
+                        label = "MISSIONS",
+                        iconRes = R.drawable.ic_dock_missions,
+                        badgeCount = claimableMissionsCount,
+                        accentColor = Color(0xFFFFB300),
+                        onClick = { onNavigate(Screen.QUESTS) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    DockTabItem(
+                        label = "RANKS",
+                        iconRes = R.drawable.ic_dock_ranks,
+                        accentColor = Color(0xFFFF0055),
+                        onClick = { onNavigate(Screen.LEADERBOARD) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    DockTabItem(
+                        label = "VAULT",
+                        iconRes = R.drawable.ic_dock_vault,
+                        accentColor = Color(0xFF00FF66),
+                        onClick = { onNavigate(Screen.CAREER) },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
 
-        // Modals & Drawers
-        if (showModeSelectionDrawer) {
-            ModeSelectionDrawer(
-                selectedScreen = currentModeSpec.screen,
-                onSelectMode = { spec ->
-                    val index = ModeSelectionCatalog.ALL_MODES.indexOfFirst { it.title == spec.title }
-                    if (index >= 0) selectedModeIndex = index
-                    showModeSelectionDrawer = false
-                },
-                onDismiss = { showModeSelectionDrawer = false }
-            )
-        }
-
+        // Drawers & Overlays
         if (showSettingsDialog) {
             SettingsDialog(
                 settingsManager = SettingsManager.getInstance(LocalContext.current),
@@ -545,23 +498,28 @@ fun MainMenuScreen(
         if (showDailyGlitchDialog) {
             val todaySeedDate = DailyGlitchCountdownManager.getSeedHeaderDate()
             val lastGlitchDate by profileManager.lastGlitchSeedDate.collectAsState()
-            val hasTicketToday = lastGlitchDate != todaySeedDate
+            val lastExtraRetryDate by profileManager.lastGlitchExtraRetryDate.collectAsState()
 
-            val dailyUiState = remember(hasTicketToday, todaySeedDate) {
+            val hasTicketToday = lastGlitchDate != todaySeedDate
+            val hasExtraRetryToday = lastExtraRetryDate != todaySeedDate
+
+            val userGlitchScore by profileManager.glitchBestScore.collectAsState()
+            val userGlitchWaves by profileManager.glitchBestWaves.collectAsState()
+
+            val dailyUiState = remember(hasTicketToday, hasExtraRetryToday, todaySeedDate, userGlitchScore, userGlitchWaves) {
                 DailyGlitchUiState(
                     seedDateFormatted = todaySeedDate,
                     timeRemainingMillis = DailyGlitchCountdownManager.getMillisUntilNextUtcMidnight(),
-                    formattedTimeRemaining = DailyGlitchCountdownManager.formatDurationHms(DailyGlitchCountdownManager.getMillisUntilNextUtcMidnight()),
+                    formattedTimeRemaining = DailyGlitchCountdownManager.formatDurationHms(
+                        DailyGlitchCountdownManager.getMillisUntilNextUtcMidnight()
+                    ),
                     hasTicketAvailable = hasTicketToday,
-                    userPersonalBestScore = 0L,
-                    userPersonalBestWaves = 0,
+                    hasExtraRetryAvailable = hasExtraRetryToday,
+                    userPersonalBestScore = userGlitchScore,
+                    userPersonalBestWaves = userGlitchWaves,
                     userRank = null,
                     retryStarCost = 100,
-                    leaderboardPreview = listOf(
-                        DailyLeaderboardEntry(1, "CYBER_GHOST", 14200L, 8, DailyGlitchTier.BRONZE),
-                        DailyLeaderboardEntry(2, "NEON_VIPER", 12100L, 6, DailyGlitchTier.BRONZE),
-                        DailyLeaderboardEntry(3, "VOID_WALKER", 9800L, 5, DailyGlitchTier.BRONZE)
-                    ),
+                    leaderboardPreview = emptyList(),
                     userEntry = null
                 )
             }
@@ -572,7 +530,11 @@ fun MainMenuScreen(
                 uiState = dailyUiState,
                 isNoAdsPurchased = isNoAdsPurchased,
                 onLaunchMission = {
-                    profileManager.consumeGlitchTicket(todaySeedDate)
+                    if (hasTicketToday) {
+                        profileManager.consumeGlitchTicket(todaySeedDate)
+                    } else {
+                        profileManager.consumeGlitchExtraRetry(todaySeedDate)
+                    }
                     showDailyGlitchDialog = false
                     onNavigate(Screen.DAILY_GLITCH)
                 },
@@ -591,6 +553,475 @@ fun MainMenuScreen(
                     }
                 },
                 onDismiss = { showDailyLoginDialog = false }
+            )
+        }
+    }
+}
+
+/**
+ * Tactical Mode Card with Specular Sweep & Procedural Radar Graticule.
+ */
+@Composable
+private fun TacticalModeCard(
+    mode: GameMode,
+    telemetry: ModeTelemetry,
+    pageOffset: Float,
+    isFavorite: Boolean = false,
+    onToggleFavorite: () -> Unit = {},
+    onInitiate: () -> Unit
+) {
+    val midLayerParallax = -pageOffset * 10f
+    val deepGlyphParallax = -pageOffset * 26f
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1.0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "btnScale"
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "cardMotion")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "corePulse"
+    )
+
+    val radarAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.283f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "radarAngle"
+    )
+
+    val sheenProgress by infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sheenProgress"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(410.dp)
+            .cyberBorderGlow(
+                colors = listOf(mode.primaryColor, Color.Transparent),
+                cornerRadius = 16.dp
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xF20F1829), Color(0xFD050912))
+                )
+            )
+            .border(1.4.dp, mode.primaryColor.copy(alpha = 0.85f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Card Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(mode.primaryColor.copy(alpha = 0.2f))
+                            .border(0.5.dp, mode.primaryColor, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = mode.badgeLabel,
+                            color = mode.primaryColor,
+                            fontSize = 8.sp,
+                            fontFamily = ChakraPetchFontFamily,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "Favorite Mode",
+                        tint = if (isFavorite) Color(0xFFFFD600) else Color(0x66FFFFFF),
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable { onToggleFavorite() }
+                    )
+                }
+
+                Text(
+                    text = if (isFavorite) "★ FAVORITE" else "SECTOR V4.2",
+                    color = if (isFavorite) Color(0xFFFFD600) else Color(0xFF556980),
+                    fontSize = 8.sp,
+                    fontFamily = ChakraPetchFontFamily,
+                    fontWeight = if (isFavorite) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+
+            // Mode Title Block
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = mode.title,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontFamily = OrbitronFontFamily,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = mode.subtitle,
+                    color = mode.primaryColor,
+                    fontSize = 9.sp,
+                    fontFamily = ChakraPetchFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            // Mode Core Viewport (Central Holographic Diorama)
+            Box(
+                modifier = Modifier
+                    .size(135.dp)
+                    .graphicsLayer {
+                        translationX = midLayerParallax
+                    }
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xCC070C17))
+                    .border(1.dp, mode.primaryColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                // Procedural Circular Reticle Graticule & Radar Sweep
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val r = size.width * 0.44f
+
+                    drawCircle(
+                        color = mode.primaryColor.copy(alpha = 0.15f * pulse),
+                        radius = r,
+                        center = Offset(cx, cy),
+                        style = Stroke(width = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
+                    )
+
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(mode.primaryColor.copy(alpha = 0.35f * pulse), Color.Transparent),
+                            center = Offset(cx, cy),
+                            radius = r
+                        ),
+                        radius = r,
+                        center = Offset(cx, cy)
+                    )
+
+                    // Sweeping Radar Line
+                    val endX = cx + r * cos(radarAngle)
+                    val endY = cy + r * sin(radarAngle)
+                    drawLine(
+                        brush = Brush.linearGradient(
+                            colors = listOf(mode.primaryColor.copy(alpha = 0.7f), Color.Transparent),
+                            start = Offset(cx, cy),
+                            end = Offset(endX, endY)
+                        ),
+                        start = Offset(cx, cy),
+                        end = Offset(endX, endY),
+                        strokeWidth = 1.8f
+                    )
+                }
+
+                Image(
+                    painter = painterResource(id = mode.glyphRes),
+                    contentDescription = mode.title,
+                    modifier = Modifier
+                        .size(95.dp)
+                        .graphicsLayer {
+                            translationX = deepGlyphParallax
+                            blendMode = BlendMode.Screen
+                        },
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            // Lore / Description
+            Text(
+                text = mode.description,
+                color = Color(0xFF8FA3BF),
+                fontSize = 10.sp,
+                fontFamily = ChakraPetchFontFamily,
+                textAlign = TextAlign.Center,
+                lineHeight = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            // Telemetry Readout Strip
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0x990A101C))
+                    .border(0.8.dp, Color(0xFF1B283C), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "APEX RECORD",
+                        color = Color(0xFF556980),
+                        fontSize = 8.sp,
+                        fontFamily = ChakraPetchFontFamily
+                    )
+                    Text(
+                        text = String.format(Locale.US, "%,d", telemetry.apexScore),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontFamily = OrbitronFontFamily,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = telemetry.secondaryLabel,
+                        color = Color(0xFF556980),
+                        fontSize = 8.sp,
+                        fontFamily = ChakraPetchFontFamily
+                    )
+                    Text(
+                        text = telemetry.secondaryValue,
+                        color = mode.primaryColor,
+                        fontSize = 13.sp,
+                        fontFamily = OrbitronFontFamily,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Primary Initiation CTA Button
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .graphicsLayer {
+                        scaleX = buttonScale
+                        scaleY = buttonScale
+                    }
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(mode.primaryColor, mode.primaryColor.copy(alpha = 0.85f))
+                        )
+                    )
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null
+                    ) { onInitiate() },
+                contentAlignment = Alignment.Center
+            ) {
+                // Specular Light Sweep Pass
+                Canvas(modifier = Modifier.matchParentSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val sheenX = w * sheenProgress
+                    val sheenWidth = w * 0.35f
+
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.28f),
+                                Color.Transparent
+                            ),
+                            start = Offset(sheenX, 0f),
+                            end = Offset(sheenX + sheenWidth, h)
+                        ),
+                        size = Size(w, h)
+                    )
+                }
+
+                Text(
+                    text = mode.ctaLabel,
+                    color = Color(0xFF040711),
+                    fontSize = 12.sp,
+                    fontFamily = OrbitronFontFamily,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.2.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Segmented HUD Pagination Pips.
+ */
+@Composable
+private fun TacticalPagerPips(
+    pageCount: Int,
+    currentPage: Int,
+    accentColor: Color,
+    onSelectPage: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        for (i in 0 until pageCount) {
+            val isSelected = i == currentPage
+            val pipWidth by animateDpAsState(
+                targetValue = if (isSelected) 26.dp else 10.dp,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "pipWidth"
+            )
+
+            Box(
+                modifier = Modifier
+                    .height(4.dp)
+                    .width(pipWidth)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (isSelected) accentColor else Color(0xFF1E2D44))
+                    .clickable { onSelectPage(i) }
+            )
+        }
+    }
+}
+
+/**
+ * Bottom HUD Dock Navigation Bar.
+ */
+@Composable
+private fun DockTabItem(
+    label: String,
+    @DrawableRes iconRes: Int,
+    accentColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    badgeCount: Int = 0
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable {
+                SfxManager.playSfx(SfxType.UI_CONFIRM)
+                onClick()
+            }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = label,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer {
+                            blendMode = BlendMode.Screen
+                        }
+                )
+                if (badgeCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 6.dp, y = (-4).dp)
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFB300)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "$badgeCount",
+                            color = Color(0xFF060911),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = ChakraPetchFontFamily
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = label,
+                color = accentColor,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = ChakraPetchFontFamily,
+                letterSpacing = 0.5.sp
+            )
+        }
+    }
+}
+
+/**
+ * Ambient floating data motes (Cyber Dust) that provide living depth to the cockpit.
+ */
+@Composable
+private fun AmbientCyberMotes(accentColor: Color) {
+    val infiniteTransition = rememberInfiniteTransition(label = "moteCycle")
+    val cycleProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(9000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "motes"
+    )
+
+    // Pre-allocated immutable mote coordinates
+    val motes = remember {
+        List(18) {
+            Triple(
+                Random.nextFloat(), // X ratio
+                Random.nextFloat(), // Base Y ratio
+                Random.nextFloat() * 2.5f + 1.5f // Radius
+            )
+        }
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+
+        motes.forEach { (xRatio, ySeed, radius) ->
+            val curY = ((ySeed - cycleProgress + 1f) % 1f) * h
+            val curX = (xRatio * w) + (sin((cycleProgress * 6.28f) + (xRatio * 10f)) * 16f)
+
+            drawCircle(
+                color = accentColor.copy(alpha = 0.18f),
+                radius = radius,
+                center = Offset(curX, curY)
             )
         }
     }

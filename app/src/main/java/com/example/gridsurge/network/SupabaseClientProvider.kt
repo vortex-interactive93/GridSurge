@@ -4,6 +4,8 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.realtime.Realtime
+import io.ktor.client.engine.okhttp.OkHttp
 
 object SupabaseClientProvider {
 
@@ -22,8 +24,13 @@ object SupabaseClientProvider {
             supabaseUrl = if (isConfigured) SUPABASE_URL else "https://placeholder.supabase.co",
             supabaseKey = if (isConfigured) SUPABASE_ANON_KEY else "placeholder-key"
         ) {
+            httpEngine = OkHttp.create()
             install(Postgrest)
-            install(Auth)
+            install(Auth) {
+                scheme = "gridsurge"
+                host = "auth-callback"
+            }
+            install(Realtime)
         }
     }
 }

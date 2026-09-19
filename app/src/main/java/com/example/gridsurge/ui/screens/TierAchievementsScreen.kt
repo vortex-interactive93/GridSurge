@@ -284,6 +284,12 @@ fun TierAchievementsScreen(
     val highScore by profileManager.highScore.collectAsState()
     val highestSector by profileManager.highestSectorCleared.collectAsState()
     val ratingPoints by profileManager.ratingPoints.collectAsState()
+    val feverActivations by profileManager.feverActivations.collectAsState()
+    val blitzHighScore by profileManager.blitzHighScore.collectAsState()
+    val clashWins by profileManager.clashWins.collectAsState()
+    val glitchSeedsCompleted by profileManager.glitchSeedsCompleted.collectAsState()
+    val perfectStarsCount by profileManager.perfectStarsCount.collectAsState()
+    val relicWinsCount by profileManager.relicWinsCount.collectAsState()
 
     var expandedCategoryIds by remember {
         mutableStateOf(setOf("cat_core", "cat_adventure", "cat_blitz", "cat_pvp", "cat_events"))
@@ -416,6 +422,12 @@ fun TierAchievementsScreen(
                             "chain_score" -> highScore.toLong()
                             "chain_sectors" -> highestSector.toLong()
                             "chain_rating_points" -> ratingPoints.toLong()
+                            "chain_fever" -> feverActivations.toLong()
+                            "chain_blitz_score" -> blitzHighScore.toLong()
+                            "chain_pvp_wins" -> clashWins.toLong()
+                            "chain_glitch_seeds" -> glitchSeedsCompleted.toLong()
+                            "chain_perfect_stars" -> perfectStarsCount.toLong()
+                            "chain_relics" -> relicWinsCount.toLong()
                             else -> 0L
                         }
 

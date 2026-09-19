@@ -22,10 +22,18 @@ class JuiceCoordinator(
     // Callback to trigger shake in the View
     var onTriggerShake: ((Float) -> Unit)? = null
 
+    private fun getCellCenterX(col: Int): Float {
+        return boardRect.left + cellSpacing + col * (cellSize + cellSpacing) + cellSize / 2f
+    }
+
+    private fun getCellCenterY(row: Int): Float {
+        return boardRect.top + cellSpacing + row * (cellSize + cellSpacing) + cellSize / 2f
+    }
+
     fun onPiecePlaced(placedCoords: List<Pair<Int, Int>>, color: Int) {
         placedCoords.forEach { (col, row) ->
-            val cx = boardRect.left + cellSpacing + (col + 0.5f) * (cellSize + cellSpacing)
-            val cy = boardRect.top + cellSpacing + (row + 0.5f) * (cellSize + cellSpacing)
+            val cx = getCellCenterX(col)
+            val cy = getCellCenterY(row)
             juiceFx.spawnLandingShockwave(cx, cy, color)
         }
     }
@@ -39,23 +47,24 @@ class JuiceCoordinator(
         val rowsMask = result.clearedRows.fold(0) { mask, r -> mask or (1 shl r) }
         val colsMask = result.clearedCols.fold(0) { mask, c -> mask or (1 shl c) }
         juiceFx.triggerLineImpactFlash(rowsMask, colsMask)
+
         result.clearedRows.forEach { r ->
+            val cy = getCellCenterY(r)
             for (c in 0 until 8) {
-                val cx = boardRect.left + cellSpacing + (c + 0.5f) * (cellSize + cellSpacing)
-                val cy = boardRect.top + cellSpacing + (r + 0.5f) * (cellSize + cellSpacing)
+                val cx = getCellCenterX(c)
                 spawnBurstParticles(cx, cy, Color.parseColor("#00E5FF"), count = 3)
             }
         }
         result.clearedCols.forEach { c ->
+            val cx = getCellCenterX(c)
             for (r in 0 until 8) {
-                val cx = boardRect.left + cellSpacing + (c + 0.5f) * (cellSize + cellSpacing)
-                val cy = boardRect.top + cellSpacing + (r + 0.5f) * (cellSize + cellSpacing)
+                val cy = getCellCenterY(r)
                 spawnBurstParticles(cx, cy, Color.parseColor("#EA80FC"), count = 3)
             }
         }
 
         result.clearedRows.forEach { r ->
-            val yCenter = boardRect.top + cellSpacing + (r + 0.5f) * (cellSize + cellSpacing)
+            val yCenter = getCellCenterY(r)
             val h = cellSize * 1.6f
             val rect = RectF(boardRect.left - 12f * density, yCenter - h / 2f, boardRect.right + 12f * density, yCenter + h / 2f)
             val type = if (comboStreak >= 3) SpriteVfxType.ROW_LIGHTNING else SpriteVfxType.ROW_LASER
@@ -63,7 +72,7 @@ class JuiceCoordinator(
         }
 
         result.clearedCols.forEach { c ->
-            val xCenter = boardRect.left + cellSpacing + (c + 0.5f) * (cellSize + cellSpacing)
+            val xCenter = getCellCenterX(c)
             val w = cellSize * 1.6f
             val topBound = maxOf(boardRect.top, 85f * density)
             val rect = RectF(xCenter - w / 2f, topBound, xCenter + w / 2f, boardRect.bottom + 14f * density)
@@ -74,13 +83,41 @@ class JuiceCoordinator(
             val size = cellSize * 2.8f
             result.clearedRows.forEach { r ->
                 result.clearedCols.forEach { c ->
-                    val cx = boardRect.left + cellSpacing + (c + 0.5f) * (cellSize + cellSpacing)
-                    val cy = boardRect.top + cellSpacing + (r + 0.5f) * (cellSize + cellSpacing)
+                    val cx = getCellCenterX(c)
+                    val cy = getCellCenterY(r)
                     val rect = RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
                     spriteVfxEngine.spawnVfx(SpriteVfxType.CROSS_BURST, rect, now)
                 }
             }
         }
+
+        // Compute dynamic centroid from cleared lines to avoid static middle stacking
+        val targetX: Float
+        val targetY: Float
+
+        if (result.clearedCols.isNotEmpty() && result.clearedRows.isNotEmpty()) {
+            targetX = getCellCenterX(result.clearedCols.first())
+            targetY = getCellCenterY(result.clearedRows.first())
+        } else if (result.clearedRows.isNotEmpty()) {
+            targetX = boardRect.centerX()
+            targetY = getCellCenterY(result.clearedRows.first())
+        } else if (result.clearedCols.isNotEmpty()) {
+            targetX = getCellCenterX(result.clearedCols.first())
+            targetY = boardRect.centerY()
+        } else {
+            targetX = boardRect.centerX()
+            targetY = boardRect.centerY()
+        }
+
+        // Spawn high-readability tiered points popup
+        scorePopupManager.spawnScore(
+            originX = targetX,
+            originY = targetY,
+            points = result.pointsEarned.toLong(),
+            isCombo = comboStreak > 1,
+            streakCount = comboStreak,
+            now = now
+        )
     }
 
     fun spawnLaserVfx(rowsMask: Int, colsMask: Int, color: Int) {
@@ -89,13 +126,13 @@ class JuiceCoordinator(
 
         for (r in 0 until 8) {
             if ((rowsMask and (1 shl r)) != 0) {
-                val y = boardRect.top + cellSpacing + (r + 0.5f) * (cellSize + cellSpacing)
+                val y = getCellCenterY(r)
                 vfxPool.spawnHorizontalLaser(r, boardRect.left, y, boardRect.right, laserCore, laserGlow)
             }
         }
         for (c in 0 until 8) {
             if ((colsMask and (1 shl c)) != 0) {
-                val x = boardRect.left + cellSpacing + (c + 0.5f) * (cellSize + cellSpacing)
+                val x = getCellCenterX(c)
                 vfxPool.spawnVerticalLaser(c, x, boardRect.top, boardRect.bottom, laserCore, laserGlow)
             }
         }
@@ -104,8 +141,8 @@ class JuiceCoordinator(
             if ((rowsMask and (1 shl r)) != 0) {
                 for (c in 0 until 8) {
                     if ((colsMask and (1 shl c)) != 0) {
-                        val cx = boardRect.left + cellSpacing + (c + 0.5f) * (cellSize + cellSpacing)
-                        val cy = boardRect.top + cellSpacing + (r + 0.5f) * (cellSize + cellSpacing)
+                        val cx = getCellCenterX(c)
+                        val cy = getCellCenterY(r)
                         vfxPool.spawnIntersection(r, c, cx, cy, Color.parseColor("#FF0055"))
                     }
                 }
@@ -134,22 +171,22 @@ class JuiceCoordinator(
     }
 
     fun spawnCorruptionSpread(fromIdx: Int, toIdx: Int) {
-        val fx = boardRect.left + cellSpacing + (fromIdx % 8 + 0.5f) * (cellSize + cellSpacing)
-        val fy = boardRect.top + cellSpacing + (fromIdx / 8 + 0.5f) * (cellSize + cellSpacing)
-        val tx = boardRect.left + cellSpacing + (toIdx % 8 + 0.5f) * (cellSize + cellSpacing)
-        val ty = boardRect.top + cellSpacing + (toIdx / 8 + 0.5f) * (cellSize + cellSpacing)
+        val fx = getCellCenterX(fromIdx % 8)
+        val fy = getCellCenterY(fromIdx / 8)
+        val tx = getCellCenterX(toIdx % 8)
+        val ty = getCellCenterY(toIdx / 8)
         juiceFx.spawnCorruptionSpread(fx, fy, tx, ty)
     }
 
     fun spawnBurstParticlesForCell(index: Int, color: Int, count: Int = 15) {
-        val x = boardRect.left + cellSpacing + (index % 8 + 0.5f) * (cellSize + cellSpacing)
-        val y = boardRect.top + cellSpacing + (index / 8 + 0.5f) * (cellSize + cellSpacing)
+        val x = getCellCenterX(index % 8)
+        val y = getCellCenterY(index / 8)
         juiceFx.spawnBurstParticles(x, y, color, count)
     }
 
     fun getCellCenter(index: Int, out: RectF) {
-        val x = boardRect.left + cellSpacing + (index % 8 + 0.5f) * (cellSize + cellSpacing)
-        val y = boardRect.top + cellSpacing + (index / 8 + 0.5f) * (cellSize + cellSpacing)
+        val x = getCellCenterX(index % 8)
+        val y = getCellCenterY(index / 8)
         out.set(x, y, x, y)
     }
 }

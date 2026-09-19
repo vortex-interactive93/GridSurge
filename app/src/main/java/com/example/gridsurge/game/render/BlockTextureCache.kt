@@ -43,6 +43,8 @@ class BlockTextureCache(private val context: Context) {
     private var scaledCoreCrackedBoard: Bitmap? = null
     private var scaledInfectedBoard: Bitmap? = null
     private var scaledInfectedDock: Bitmap? = null
+    var scaledStasisJammerBoard: Bitmap? = null
+    var scaledStasisJammerDock: Bitmap? = null
 
     // Augment Icon Cache
     private val augmentIconCache = mutableMapOf<Int, Bitmap>()
@@ -169,26 +171,6 @@ class BlockTextureCache(private val context: Context) {
         safeDecode("solar_red", R.drawable.skin_solar_flare_red)
         safeDecode("solar_blue", R.drawable.skin_solar_flare_blue)
         safeDecode("solar_cyan", R.drawable.skin_solar_flare_cyan)
-
-        // Custom 3D Cyber Void Color Variants
-        safeDecodeVariant("cyber_yellow", "skin_cyber_void_yellow", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("cyber_orange", "skin_cyber_void_orange", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("cyber_green", "skin_cyber_void_green", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("cyber_purple", "skin_cyber_void_purple", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("cyber_pink", "skin_cyber_void_pink", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("cyber_red", "skin_cyber_void_red", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("cyber_blue", "skin_cyber_void_blue", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("cyber_cyan", "skin_cyber_void_cyan", R.drawable.skin_midnight_glass_cyan)
-
-        // Custom 3D Solar Flare Color Variants
-        safeDecodeVariant("solar_yellow", "skin_solar_flare_yellow", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("solar_orange", "skin_solar_flare_orange", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("solar_green", "skin_solar_flare_green", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("solar_purple", "skin_solar_flare_purple", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("solar_pink", "skin_solar_flare_pink", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("solar_red", "skin_solar_flare_red", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("solar_blue", "skin_solar_flare_blue", R.drawable.skin_midnight_glass_cyan)
-        safeDecodeVariant("solar_cyan", "skin_solar_flare_cyan", R.drawable.skin_midnight_glass_cyan)
     }
 
     private fun loadBoosterIcons() {
@@ -281,18 +263,21 @@ class BlockTextureCache(private val context: Context) {
         scaledCoreIntactBoard = loadAndScale(R.drawable.skin_core_block, currentBoardCellPx)
         scaledCoreCrackedBoard = loadAndScale(R.drawable.skin_core_cracked, currentBoardCellPx)
         scaledInfectedBoard = loadAndScale(R.drawable.skin_infected_block, currentBoardCellPx)
+        scaledStasisJammerBoard = loadAndScale(R.drawable.stasis_jammer, currentBoardCellPx)
 
         scaledCatalystDock?.recycle()
         scaledWarpDock?.recycle()
         scaledNovaCoreDock?.recycle()
         scaledCircuitDock?.recycle()
         scaledInfectedDock?.recycle()
+        scaledStasisJammerDock?.recycle()
 
         scaledCatalystDock = scaledCatalystBoard?.let { Bitmap.createScaledBitmap(it, currentDockCellPx, currentDockCellPx, true) }
         scaledWarpDock = scaledWarpBoard?.let { Bitmap.createScaledBitmap(it, currentDockCellPx, currentDockCellPx, true) }
         scaledNovaCoreDock = scaledNovaCoreBoard?.let { Bitmap.createScaledBitmap(it, currentDockCellPx, currentDockCellPx, true) }
         scaledCircuitDock = scaledCircuitBoard?.let { Bitmap.createScaledBitmap(it, currentDockCellPx, currentDockCellPx, true) }
         scaledInfectedDock = scaledInfectedBoard?.let { Bitmap.createScaledBitmap(it, currentDockCellPx, currentDockCellPx, true) }
+        scaledStasisJammerDock = scaledStasisJammerBoard?.let { Bitmap.createScaledBitmap(it, currentDockCellPx, currentDockCellPx, true) }
     }
 
     private fun getHypercubeColorKey(tintColor: Int): String {

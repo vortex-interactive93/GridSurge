@@ -195,6 +195,7 @@ fun DailyGlitchEntryDialog(
                     // Ticket Status Card
                     DailyGlitchTicketCard(
                         hasTicket = uiState.hasTicketAvailable,
+                        hasExtraRetry = uiState.hasExtraRetryAvailable,
                         score = uiState.userPersonalBestScore,
                         waves = uiState.userPersonalBestWaves,
                         userRank = uiState.userRank
@@ -280,31 +281,30 @@ fun DailyGlitchEntryDialog(
                                 onLaunchMission()
                             }
                         )
-                    } else if (isNoAdsPurchased) {
+                    } else if (uiState.hasExtraRetryAvailable) {
                         CyberActionButton(
-                            text = "BONUS RETRY [NO-ADS PASS ✓]",
-                            primaryColor = NeonGlitchGreen,
-                            isPrimary = true,
-                            onClick = {
-                                SfxManager.playSfx(SfxType.LEVEL_COMPLETE)
-                                onLaunchMission()
-                            }
-                        )
-                    } else {
-                        CyberActionButton(
-                            text = "RE-TRY SEED [WATCH AD]",
+                            text = if (isNoAdsPurchased) "BONUS RETRY [NO-ADS PASS ✓]" else "RE-TRY SEED [WATCH AD]",
                             primaryColor = Color(0xFFFFD600),
                             isPrimary = true,
                             onClick = {
                                 SfxManager.playSfx(SfxType.UI_CONFIRM)
                                 if (activity != null) {
-                                    AdManager.showRewardedAd(activity, isNoAdsPurchased) {
-                                        onLaunchMission()
-                                    }
+                                    AdManager.showRewardedAd(
+                                        activity = activity,
+                                        isNoAdsPurchased = isNoAdsPurchased,
+                                        onRewardEarned = { onLaunchMission() }
+                                    )
                                 } else {
                                     onLaunchMission()
                                 }
                             }
+                        )
+                    } else {
+                        CyberActionButton(
+                            text = "DAILY LIMIT REACHED [LOCKED]",
+                            primaryColor = Color(0xFF8A99AD),
+                            isPrimary = false,
+                            onClick = {}
                         )
                     }
 
@@ -328,21 +328,27 @@ fun DailyGlitchEntryDialog(
 @Composable
 private fun DailyGlitchTicketCard(
     hasTicket: Boolean,
+    hasExtraRetry: Boolean,
     score: Long,
     waves: Int,
     userRank: Int?
 ) {
+    val bannerColor = when {
+        hasTicket -> NeonGlitchGreen
+        hasExtraRetry -> Color(0xFFFFD600)
+        else -> NeonGlitchRed
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 brush = Brush.horizontalGradient(
-                    if (hasTicket) listOf(Color(0x2600FF66), Color(0x1000E5FF))
-                    else listOf(Color(0x26FF0055), Color(0x10000000))
+                    listOf(bannerColor.copy(alpha = 0.15f), Color(0x10000000))
                 ),
                 shape = CyberChamferShape
             )
-            .border(1.dp, if (hasTicket) Color(0x6600FF66) else Color(0x44FF0055), CyberChamferShape)
+            .border(1.dp, bannerColor.copy(alpha = 0.45f), CyberChamferShape)
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Row(
@@ -352,16 +358,23 @@ private fun DailyGlitchTicketCard(
         ) {
             Column {
                 Text(
-                    text = if (hasTicket) "1 FREE ACCESS PASS READY" else "DAILY ATTEMPT LOGGED",
-                    color = if (hasTicket) NeonGlitchGreen else NeonGlitchRed,
+                    text = when {
+                        hasTicket -> "1 FREE ACCESS PASS READY"
+                        hasExtraRetry -> "1 EXTRA RETRY REMAINING"
+                        else -> "DAILY ATTEMPT LOGGED"
+                    },
+                    color = bannerColor,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = if (hasTicket) "Compete on identical seeds worldwide"
-                    else "Current Run: Wave $waves • ${String.format(Locale.US, "%,d", score)} PTS",
+                    text = when {
+                        hasTicket -> "Compete on identical seeds worldwide"
+                        hasExtraRetry -> "Best Run: Wave $waves • ${String.format(Locale.US, "%,d", score)} PTS"
+                        else -> "Best Run: Wave $waves • ${String.format(Locale.US, "%,d", score)} PTS (Resets at UTC midnight)"
+                    },
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium

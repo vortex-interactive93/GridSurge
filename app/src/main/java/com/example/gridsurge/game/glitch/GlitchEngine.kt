@@ -65,6 +65,8 @@ class GlitchEngine(val gridSize: Int = 8) {
     var totalPurgedCount: Int = 0
         private set
     var waveInfectionsSpawned: Int = 0
+    val purity: Float
+        get() = (1.0f - (activeInfections.size * 0.08f)).coerceIn(0.15f, 1.0f)
     private val maxSimultaneousInfections: Int
         get() = (4 + currentWave).coerceAtMost(7)
 
@@ -132,17 +134,18 @@ class GlitchEngine(val gridSize: Int = 8) {
                 purgedThisTurn++
             } else {
                 // Decrement turn countdown
-                infection.turnsRemaining--
+                if (infection.turnsRemaining > 0) {
+                    infection.turnsRemaining--
+                }
 
                 if (infection.turnsRemaining <= 0) {
-                    // SPREAD INFECTION: Infect an adjacent cardinal neighbor
+                    // SPREAD INFECTION: Infect an adjacent cardinal neighbor and transmute this cell to slag
+                    infection.turnsRemaining = 0
+                    currentGrid[index] = 9
                     val spreadTarget = findAdjacentSpreadTarget(index, currentGrid)
                     if (spreadTarget != -1) {
                         spreadEvents.add(GlitchSpreadEvent(fromIndex = index, toIndex = spreadTarget))
                     }
-                    // Reset this catalyst's countdown
-                    infection.turnsRemaining = 4
-                    infection.phase = InfectionPhase.INCUBATING
                 } else {
                     infection.phase = when {
                         infection.turnsRemaining <= 1 -> InfectionPhase.CRITICAL

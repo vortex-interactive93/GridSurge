@@ -35,6 +35,9 @@ import com.example.gridsurge.ui.CyberActionButton
 import com.example.gridsurge.ui.CyberChamferShape
 import com.example.gridsurge.features.adventure.ui.dialogs.*
 import com.example.gridsurge.features.adventure.data.RelicCatalog
+import com.example.gridsurge.game.campaign.model.*
+import com.example.gridsurge.ui.campaign.components.SectorMilestoneVaultStrip
+import com.example.gridsurge.ui.campaign.dialogs.TacticalStageBriefingDialog
 import java.util.Locale
 
 private val NeonCyan = Color(0xFF00E5FF)
@@ -296,15 +299,43 @@ fun SectorMapScreen(
 
         // Level Briefing Dialog
         selectedLevelForBriefing?.let { levelNode ->
-            val blueprint = AdventureSectorRegistry.getLevelBlueprint(levelNode.levelNumber)
+            val progress = progressMap[levelNode.levelNumber] ?: LevelProgressRecord(levelNode.levelNumber)
+            val bp = AdventureSectorRegistry.getLevelBlueprint(levelNode.levelNumber)
             val benchmark = AdventureSectorRegistry.getBenchmark(levelNode.levelNumber)
-            
-            StageBriefingModal(
-                blueprint = blueprint,
-                benchmark = benchmark,
-                onEngage = {
+
+            val hazard = when {
+                levelNode.isBossLevel -> StageHazardType.CORE_ANOMALY_BOSS
+                levelNode.levelInSector == 3 || levelNode.levelInSector == 6 -> StageHazardType.REPLICATING_GLITCH
+                levelNode.levelInSector % 2 == 0 -> StageHazardType.OBSIDIAN_SLAG
+                else -> StageHazardType.NONE
+            }
+
+            val objectives = listOf(
+                StarObjective("Clear Stage Objective: ${bp.directive}", progress.starsEarned >= 1),
+                StarObjective("Move Budget: <= ${benchmark.moveBudgetStar2} Moves", progress.starsEarned >= 2),
+                StarObjective("Mastery Feat: ${benchmark.masteryFeat.description}", progress.starsEarned >= 3)
+            )
+
+            val campaignNode = CampaignStageNode(
+                stageId = levelNode.levelNumber,
+                stageCode = "STAGE %02d".format(Locale.US, levelNode.levelInSector),
+                stageTitle = bp.stageName,
+                xNorm = levelNode.normalizedX,
+                yNorm = 0.5f,
+                status = if (progress.isCompleted) StageNodeStatus.MASTERED_THREE_STAR else StageNodeStatus.CURRENT_ACTIVE,
+                hazardType = hazard,
+                starsEarned = progress.starsEarned,
+                highScore = progress.highScore,
+                objectives = objectives,
+                blueprint = StageBlueprintPreview()
+            )
+
+            TacticalStageBriefingDialog(
+                stage = campaignNode,
+                onDeploy = {
+                    val target = selectedLevelForBriefing!!
                     selectedLevelForBriefing = null
-                    onLevelSelected(levelNode)
+                    onLevelSelected(target)
                 },
                 onDismiss = { selectedLevelForBriefing = null }
             )

@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -184,12 +185,27 @@ fun CyberLeaderboardScreen(
                 }
 
                 is LeaderboardSyncState.Success -> {
-                    Column(modifier = Modifier.weight(1f)) {
-                        // Top 3 Podium (If available)
-                        if (state.topEntries.size >= 3) {
-                            PodiumSection(top3 = state.topEntries.take(3))
-                            Spacer(modifier = Modifier.height(10.dp))
+                    val top3List = remember(state.topEntries) {
+                        val list = state.topEntries.take(3).toMutableList()
+                        val placeholders = listOf(
+                            CloudLeaderboardEntry(rank = 1, callsign = "UNCLAIMED", score = 0L, title = "TOP RANK", verified = false),
+                            CloudLeaderboardEntry(rank = 2, callsign = "UNCLAIMED", score = 0L, title = "TOP RANK", verified = false),
+                            CloudLeaderboardEntry(rank = 3, callsign = "UNCLAIMED", score = 0L, title = "TOP RANK", verified = false)
+                        )
+                        for (i in list.size until 3) {
+                            list.add(placeholders[i.coerceIn(0, 2)])
                         }
+                        list
+                    }
+
+                    val remainingRows = remember(state.topEntries) {
+                        state.topEntries.drop(3)
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        // Top 3 Podium (Always visible across all modes)
+                        PodiumSection(top3 = top3List)
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         // Scrollable Leaderboard Rows (Ranks 4..100)
                         LazyColumn(
@@ -201,9 +217,27 @@ fun CyberLeaderboardScreen(
                                 .padding(8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            val listToDisplay = if (state.topEntries.size >= 3) state.topEntries.drop(3) else state.topEntries
-                            items(listToDisplay) { entry ->
-                                CloudLeaderboardRow(entry = entry)
+                            if (remainingRows.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "NO FURTHER RANKINGS // CLAIM RANK #04 IN ${selectedMode.displayName}",
+                                            color = Color(0xFF5C8599),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            } else {
+                                items(remainingRows) { entry ->
+                                    CloudLeaderboardRow(entry = entry)
+                                }
                             }
                         }
                     }
@@ -226,16 +260,16 @@ private fun PodiumSection(top3: List<CloudLeaderboardEntry>) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(115.dp),
+            .height(130.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         // #2 Silver
-        PodiumCard(entry = top3[1], rank = 2, color = Color(0xFFCFD8DC), modifier = Modifier.weight(1f).height(100.dp))
+        PodiumCard(entry = top3[1], rank = 2, color = Color(0xFFCFD8DC), modifier = Modifier.weight(1f).height(118.dp))
         // #1 Gold (Taller)
-        PodiumCard(entry = top3[0], rank = 1, color = NeonGold, modifier = Modifier.weight(1.1f).height(115.dp))
+        PodiumCard(entry = top3[0], rank = 1, color = NeonGold, modifier = Modifier.weight(1.05f).height(130.dp))
         // #3 Bronze
-        PodiumCard(entry = top3[2], rank = 3, color = Color(0xFFFF8A65), modifier = Modifier.weight(1f).height(90.dp))
+        PodiumCard(entry = top3[2], rank = 3, color = Color(0xFFFF8A65), modifier = Modifier.weight(1f).height(112.dp))
     }
 }
 
@@ -267,18 +301,36 @@ private fun PodiumCard(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (rankCrestRes != null) {
-                Image(
-                    painter = painterResource(id = rankCrestRes),
-                    contentDescription = "Rank #$rank",
-                    modifier = Modifier.size(42.dp),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                Text(text = "#$rank", color = color, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+            Box(
+                modifier = Modifier.size(50.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (rankCrestRes != null) {
+                    Image(
+                        painter = painterResource(id = rankCrestRes),
+                        contentDescription = "Rank #$rank",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text(text = "#$rank", color = color, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                }
             }
-            Text(text = entry.callsign, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1)
-            Text(text = String.format(Locale.US, "%,d", entry.score), color = color, fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+            Text(
+                text = entry.callsign,
+                color = if (entry.callsign == "UNCLAIMED") Color(0xFF5C8599) else Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1
+            )
+            Text(
+                text = if (entry.score == 0L) "-- PTS" else String.format(Locale.US, "%,d", entry.score),
+                color = if (entry.score == 0L) color.copy(alpha = 0.5f) else color,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }

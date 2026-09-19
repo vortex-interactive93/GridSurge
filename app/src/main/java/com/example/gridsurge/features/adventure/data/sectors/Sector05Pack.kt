@@ -16,12 +16,12 @@ object Sector05Pack : BaseSectorPack(
         baseDifficultyRating = 5
     ),
     stages = listOf(
-        // Stage 1 (Global Stage 37) - Calibration Stage
+        // Stage 1: Incursion Calibration (Off-Center Single Void Core)
         StageDefinition(
             stageId = StageId(5, 1),
             blueprint = StageBlueprint(
                 stageName = "GRAVITATION INITIATION",
-                directive = "Purge the central Event Horizon Gyro before its gravitational pull warps surrounding blocks.",
+                directive = "Purge the off-center Event Horizon Gyro before its gravitational pull warps surrounding blocks.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
                     title = "1 VOID CORE PURGED",
@@ -30,13 +30,13 @@ object Sector05Pack : BaseSectorPack(
                     star2TimeSec = 75
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
+                    CorePlacementSpec(col = 3, row = 2, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 3000,
-                targetScore2Star = 6000,
-                targetScore3Star = 9000,
+                targetScore1Star = 1800,
+                targetScore2Star = 3000,
+                targetScore3Star = 4200,
                 moveBudgetStar2 = 14,
                 timeLimitSecStar2 = 50,
                 masteryFeat = MasteryFeatSpec(
@@ -46,30 +46,27 @@ object Sector05Pack : BaseSectorPack(
                 )
             )
         ),
-        // Stage 2
+        // Stage 2: Line Cleanse Protocol
         StageDefinition(
             stageId = StageId(5, 2),
             blueprint = StageBlueprint(
-                stageName = "DUAL HORIZON CONVERGENCE",
-                directive = "Neutralize 2 Void Cores on opposing diagonals amidst spatial warping.",
+                stageName = "SINGULARITY SWEEP",
+                directive = "Complete 8 full line clears amidst active spatial distorting fields.",
                 objective = AdventureStageObjective(
-                    type = ObjectiveType.INFECTED_PURGE,
-                    title = "2 VOID CORES PURGED",
-                    targetAmount = 2,
+                    type = ObjectiveType.LINE_CLEANSE,
+                    title = "8 LINES CLEARED",
+                    targetAmount = 8,
                     star3TimeSec = 45,
                     star2TimeSec = 85
                 ),
-                initialCores = listOf(
-                    CorePlacementSpec(col = 2, row = 2, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 5, row = 5, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
-                )
+                initialCores = emptyList()
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 3500,
-                targetScore2Star = 7000,
-                targetScore3Star = 10500,
+                targetScore1Star = 2500,
+                targetScore2Star = 5000,
+                targetScore3Star = 7500,
                 moveBudgetStar2 = 16,
-                timeLimitSecStar2 = 60,
+                timeLimitSecStar2 = 55,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
                     targetValue = 3,
@@ -77,226 +74,222 @@ object Sector05Pack : BaseSectorPack(
                 )
             )
         ),
-        // Stage 3
+        // Stage 3: Asymmetrical Hybrid Duo (Void Core + Locked Crimson Cipher)
         StageDefinition(
             stageId = StageId(5, 3),
             blueprint = StageBlueprint(
-                stageName = "TRI-GYRO SINGULARITY",
-                directive = "Purge 3 Void Cores forming the spatial containment triangle.",
+                stageName = "HYBRID SINGULARITY",
+                directive = "Sustain a Surge Streak to unlock the Crimson Cipher while purging the adjacent Void Core.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "3 VOID CORES PURGED",
-                    targetAmount = 3,
+                    title = "2 HYBRID CORES PURGED",
+                    targetAmount = 2,
                     star3TimeSec = 50,
-                    star2TimeSec = 95
+                    star2TimeSec = 90
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 3, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
+                    CorePlacementSpec(col = 2, row = 5, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
+                    CorePlacementSpec(col = 5, row = 2, coreType = SectorCoreType.CRIMSON_CIPHER_SEC3, maxHits = 2, isLocked = true)
+                )
+            ),
+            benchmarks = StageBenchmarks(
+                targetScore1Star = 3000,
+                targetScore2Star = 6000,
+                targetScore3Star = 9000,
+                moveBudgetStar2 = 18,
+                timeLimitSecStar2 = 60,
+                masteryFeat = MasteryFeatSpec(
+                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
+                    targetValue = 2,
+                    description = "Execute a multi-line clear"
+                )
+            )
+        ),
+        // Stage 4: Chroma Synthesis
+        StageDefinition(
+            stageId = StageId(5, 4),
+            blueprint = StageBlueprint(
+                stageName = "EVENT HORIZON SYNTHESIS",
+                directive = "Synthesize 45 energy tiles amidst event horizon gravitational distortion.",
+                objective = AdventureStageObjective(
+                    type = ObjectiveType.CHROMA_SYNTHESIS,
+                    title = "45 TILES SYNTHESIZED",
+                    targetAmount = 45,
+                    star3TimeSec = 55,
+                    star2TimeSec = 100
+                ),
+                initialCores = emptyList()
+            ),
+            benchmarks = StageBenchmarks(
+                targetScore1Star = 3500,
+                targetScore2Star = 7000,
+                targetScore3Star = 11000,
+                moveBudgetStar2 = 22,
+                timeLimitSecStar2 = 70,
+                masteryFeat = MasteryFeatSpec(
+                    featType = MasteryFeatType.SCORE_THRESHOLD,
+                    targetValue = 8000,
+                    description = "Reach 8,000 points during synthesis"
+                )
+            )
+        ),
+        // Stage 5: Perimeter Confinement (Hybrid: 2 Void Cores + 1 Solar Furnace)
+        StageDefinition(
+            stageId = StageId(5, 5),
+            blueprint = StageBlueprint(
+                stageName = "HYBRID CONFINEMENT WALL",
+                directive = "Purge 2 Void Cores and 1 countdown Solar Furnace in a tight perimeter wall.",
+                objective = AdventureStageObjective(
+                    type = ObjectiveType.INFECTED_PURGE,
+                    title = "3 HYBRID CORES PURGED",
+                    targetAmount = 3,
+                    star3TimeSec = 60,
+                    star2TimeSec = 110
+                ),
+                initialCores = listOf(
+                    CorePlacementSpec(col = 1, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
+                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 5, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 4000,
                 targetScore2Star = 8000,
-                targetScore3Star = 12000,
-                moveBudgetStar2 = 18,
-                timeLimitSecStar2 = 65,
+                targetScore3Star = 12500,
+                moveBudgetStar2 = 26,
+                timeLimitSecStar2 = 80,
                 masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.SCORE_THRESHOLD,
-                    targetValue = 7500,
-                    description = "Accumulate ≥ 7,500 points"
+                    featType = MasteryFeatType.MIN_COMBO_STREAK,
+                    targetValue = 3,
+                    description = "Sustain a 3x Surge Streak"
                 )
             )
         ),
-        // Stage 4
+        // Stage 6: Momentum Harmonic
         StageDefinition(
-            stageId = StageId(5, 4),
+            stageId = StageId(5, 6),
             blueprint = StageBlueprint(
-                stageName = "QUANTUM CHROMA WARP",
-                directive = "Synthesize 35 Circuit Conduit tiles amidst gravitational distortions.",
+                stageName = "QUANTUM STREAK HARMONIC",
+                directive = "Sustain a 5x Surge Streak to collapse the Singularity Core.",
                 objective = AdventureStageObjective(
-                    type = ObjectiveType.CHROMA_SYNTHESIS,
-                    title = "35 CIRCUIT TILES",
-                    targetAmount = 35,
-                    star3TimeSec = 60,
-                    star2TimeSec = 110
+                    type = ObjectiveType.SURGE_STREAK_TARGET,
+                    title = "5X SURGE STREAK REACHED",
+                    targetAmount = 5,
+                    star3TimeSec = 65,
+                    star2TimeSec = 115
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 4, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
+                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 4)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 4500,
-                targetScore2Star = 8500,
-                targetScore3Star = 13000,
-                moveBudgetStar2 = 22,
-                timeLimitSecStar2 = 75,
+                targetScore2Star = 9000,
+                targetScore3Star = 14000,
+                moveBudgetStar2 = 26,
+                timeLimitSecStar2 = 85,
                 masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
-                    targetValue = 3,
-                    description = "Trigger a 3-line Mega Blitz clear"
+                    featType = MasteryFeatType.MIN_COMBO_STREAK,
+                    targetValue = 5,
+                    description = "Reach a 5x Surge Streak"
                 )
             )
         ),
-        // Stage 5
+        // Stage 7: Subspace Overclock (4 Asymmetric Hybrid Chokepoints)
         StageDefinition(
-            stageId = StageId(5, 5),
+            stageId = StageId(5, 7),
             blueprint = StageBlueprint(
-                stageName = "QUAD HORIZON WARP",
-                directive = "Purge all 4 corner Void Cores using Supernova Overdrive and combo chains.",
+                stageName = "HYBRID QUAD CHOKEPOINT",
+                directive = "Purge 4 hybrid cores (Void, Furnace, Cipher) placed at asymmetric choke points.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "4 VOID CORES PURGED",
+                    title = "4 HYBRID CORES PURGED",
                     targetAmount = 4,
-                    star3TimeSec = 60,
-                    star2TimeSec = 115
+                    star3TimeSec = 70,
+                    star2TimeSec = 120
                 ),
                 initialCores = listOf(
                     CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
+                    CorePlacementSpec(col = 2, row = 6, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2),
+                    CorePlacementSpec(col = 5, row = 1, coreType = SectorCoreType.CRIMSON_CIPHER_SEC3, maxHits = 2, isLocked = true),
                     CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 5000,
-                targetScore2Star = 9000,
-                targetScore3Star = 14000,
-                moveBudgetStar2 = 24,
-                timeLimitSecStar2 = 80,
+                targetScore2Star = 10000,
+                targetScore3Star = 15500,
+                moveBudgetStar2 = 30,
+                timeLimitSecStar2 = 95,
                 masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.MIN_COMBO_STREAK,
-                    targetValue = 3,
-                    description = "Reach a 3x Surge Streak"
+                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
+                    targetValue = 2,
+                    description = "Execute a multi-line clear"
                 )
             )
         ),
-        // Stage 6
+        // Stage 8: Dual-Wave Escalation
         StageDefinition(
-            stageId = StageId(5, 6),
+            stageId = StageId(5, 8),
             blueprint = StageBlueprint(
-                stageName = "EVENT HORIZON HARMONIC",
-                directive = "Achieve a 5x Surge Streak in maximum gravitational instability.",
-                objective = AdventureStageObjective(
-                    type = ObjectiveType.SURGE_STREAK_TARGET,
-                    title = "5x SURGE STREAK",
-                    targetAmount = 5,
-                    star3TimeSec = 50,
-                    star2TimeSec = 95
-                ),
-                initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
-                )
-            ),
-            benchmarks = StageBenchmarks(
-                targetScore1Star = 5200,
-                targetScore2Star = 9500,
-                targetScore3Star = 15000,
-                moveBudgetStar2 = 20,
-                timeLimitSecStar2 = 65,
-                masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.MIN_COMBO_STREAK,
-                    targetValue = 4,
-                    description = "Reach a 4x Surge Streak"
-                )
-            )
-        ),
-        // Stage 7
-        StageDefinition(
-            stageId = StageId(5, 7),
-            blueprint = StageBlueprint(
-                stageName = "SINGULARITY OVERCLOCK",
-                directive = "Purge 4 corner Void Cores under extreme time constraints.",
+                stageName = "DUAL WAVE QUANTUM ESCALATION",
+                directive = "Purge 5 hybrid cores across 2 defensive waves.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "4 VOID CORES PURGED",
-                    targetAmount = 4,
-                    star3TimeSec = 65,
-                    star2TimeSec = 125
+                    title = "5 HYBRID CORES PURGED (2 WAVES)",
+                    targetAmount = 5,
+                    star3TimeSec = 80,
+                    star2TimeSec = 130
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
+                    CorePlacementSpec(col = 1, row = 2, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
+                    CorePlacementSpec(col = 6, row = 5, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 5500,
-                targetScore2Star = 10000,
-                targetScore3Star = 16000,
-                moveBudgetStar2 = 26,
-                timeLimitSecStar2 = 90,
-                masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.SCORE_THRESHOLD,
-                    targetValue = 10000,
-                    description = "Accumulate ≥ 10,000 points"
-                )
-            )
-        ),
-        // Stage 8
-        StageDefinition(
-            stageId = StageId(5, 8),
-            blueprint = StageBlueprint(
-                stageName = "DUAL WAVE HORIZON WARP",
-                directive = "Purge 4 Void Cores across 2 defensive waves.",
-                objective = AdventureStageObjective(
-                    type = ObjectiveType.INFECTED_PURGE,
-                    title = "4 CORES (2 WAVES)",
-                    targetAmount = 4,
-                    star3TimeSec = 75,
-                    star2TimeSec = 140
-                ),
-                initialCores = listOf(
-                    CorePlacementSpec(col = 2, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 5, row = 4, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
-                )
-            ),
-            benchmarks = StageBenchmarks(
-                targetScore1Star = 6000,
                 targetScore2Star = 11000,
-                targetScore3Star = 17500,
-                moveBudgetStar2 = 28,
-                timeLimitSecStar2 = 100,
+                targetScore3Star = 16800,
+                moveBudgetStar2 = 32,
+                timeLimitSecStar2 = 105,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
                     targetValue = 3,
-                    description = "Chain a 3x Streak through Wave 2"
+                    description = "Sustain a 3x Surge Streak"
                 )
             )
         ),
-        // Stage 9 (Final Campaign Apex Boss)
+        // Stage 9: Sector Apex Boss
         StageDefinition(
             stageId = StageId(5, 9),
             blueprint = StageBlueprint(
-                stageName = "EVENT HORIZON // FINAL APEX",
-                directive = "Phase 1: Destroy 4 Gravitational Relay Pylons.\nPhase 2: Strike the central Event Horizon Core to collapse the void matrix forever.",
+                stageName = "QUANTUM SINGULARITY OVERLORD // APEX",
+                directive = "Phase 1: Neutralize 4 Hybrid Pylons (Cipher/Furnace/Void).\nPhase 2: Shatter the central Singularity Core 4x.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "EVENT HORIZON DESTROYED",
+                    title = "SINGULARITY OVERLORD DEFEATED",
                     targetAmount = 5,
-                    star3TimeSec = 100,
-                    star2TimeSec = 180
+                    star3TimeSec = 95,
+                    star2TimeSec = 150
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 3, isLocked = true),
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 2)
+                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 4, isLocked = true),
+                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.CRIMSON_CIPHER_SEC3, maxHits = 1, isLocked = true),
+                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.SOLAR_CRUCIBLE_SEC2, maxHits = 1),
+                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 1),
+                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.VOID_SINGULARITY_SEC5, maxHits = 1)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 7000,
-                targetScore2Star = 13000,
-                targetScore3Star = 20000,
+                targetScore1Star = 6500,
+                targetScore2Star = 12000,
+                targetScore3Star = 18000,
                 moveBudgetStar2 = 35,
-                timeLimitSecStar2 = 130,
+                timeLimitSecStar2 = 120,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.NO_EMP_JAMMED,
                     targetValue = 1,
-                    description = "Defeat Final Apex Boss with 0 slots jammed"
+                    description = "Defeat Apex Singularity with 0 slots jammed"
                 )
             )
         )

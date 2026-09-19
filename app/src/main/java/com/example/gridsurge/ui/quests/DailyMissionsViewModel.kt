@@ -7,6 +7,8 @@ import com.example.gridsurge.meta.data.DailyMissionsRepository
 import com.example.gridsurge.meta.quests.DailyMission
 import com.example.gridsurge.meta.quests.QuestState
 import com.example.gridsurge.meta.quests.QuestType
+import com.example.gridsurge.operations.data.OperationsCatalog
+import com.example.gridsurge.operations.model.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -38,6 +40,59 @@ class DailyMissionsViewModel(
 
     private val _missions = MutableStateFlow<List<DailyMission>>(emptyList())
     val missions: StateFlow<List<DailyMission>> = _missions.asStateFlow()
+
+    val operationsState: StateFlow<DailyOperationsState> = combine(
+        combine(
+            OperationsCatalog.DEFAULT_DIRECTIVES.map { directive ->
+                combine(
+                    repository.getMissionProgress(directive.id),
+                    repository.isMissionClaimed(directive.id)
+                ) { rawProgress, claimed ->
+                    val clamped = minOf(rawProgress, directive.targetProgress)
+                    val status = when {
+                        claimed -> DirectiveStatus.CLAIMED
+                        clamped >= directive.targetProgress -> DirectiveStatus.READY_TO_CLAIM
+                        else -> DirectiveStatus.IN_PROGRESS
+                    }
+                    directive.copy(
+                        currentProgress = clamped,
+                        status = status
+                    )
+                }
+            }
+        ) { directivesArray -> directivesArray.toList() },
+        combine(
+            MilestoneTier.entries.map { tier ->
+                val milestoneKey = "milestone_${tier.name.lowercase()}"
+                repository.isMissionClaimed(milestoneKey).map { claimed ->
+                    MilestoneCacheState(tier = tier, isClaimed = claimed)
+                }
+            }
+        ) { milestonesArray -> milestonesArray.toList() }
+    ) { directivesList, milestoneStatesList ->
+        val totalOpsPoints = directivesList
+            .filter { it.status == DirectiveStatus.CLAIMED }
+            .sumOf { it.rewardPoints }
+            .coerceAtMost(100)
+
+        DailyOperationsState(
+            currentOpsPoints = totalOpsPoints,
+            maxOpsPoints = 100,
+            resetCountdownFormatted = "08:14:22",
+            directives = directivesList,
+            milestoneStates = milestoneStatesList
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DailyOperationsState(
+            currentOpsPoints = 0,
+            maxOpsPoints = 100,
+            resetCountdownFormatted = "08:14:22",
+            directives = OperationsCatalog.DEFAULT_DIRECTIVES,
+            milestoneStates = OperationsCatalog.DEFAULT_MILESTONES
+        )
+    )
 
     init {
         loadMissions()
@@ -108,6 +163,50 @@ class DailyMissionsViewModel(
             } finally {
                 claimMutex.withLock {
                     _inFlightClaims.update { it - missionId }
+                }
+            }
+        }
+    }
+
+    fun claimOperationDirective(directiveId: String) {
+        val currentState = operationsState.value
+        val directive = currentState.directives.find { it.id == directiveId } ?: return
+        if (directive.status != DirectiveStatus.READY_TO_CLAIM) return
+
+        viewModelScope.launch {
+            claimMutex.withLock {
+                if (_inFlightClaims.value.contains(directiveId)) return@launch
+                _inFlightClaims.update { it + directiveId }
+            }
+
+            try {
+                repository.setMissionClaimed(directiveId, true)
+                profileManager.addStarCurrency(directive.rewardStars)
+            } finally {
+                claimMutex.withLock {
+                    _inFlightClaims.update { it - directiveId }
+                }
+            }
+        }
+    }
+
+    fun claimMilestoneConduit(tier: MilestoneTier) {
+        val milestoneKey = "milestone_${tier.name.lowercase()}"
+        val currentState = operationsState.value
+        if (currentState.currentOpsPoints < tier.targetPoints) return
+
+        viewModelScope.launch {
+            claimMutex.withLock {
+                if (_inFlightClaims.value.contains(milestoneKey)) return@launch
+                _inFlightClaims.update { it + milestoneKey }
+            }
+
+            try {
+                repository.setMissionClaimed(milestoneKey, true)
+                profileManager.addStarCurrency(tier.starReward)
+            } finally {
+                claimMutex.withLock {
+                    _inFlightClaims.update { it - milestoneKey }
                 }
             }
         }

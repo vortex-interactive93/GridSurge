@@ -16,12 +16,12 @@ object Sector04Pack : BaseSectorPack(
         baseDifficultyRating = 4
     ),
     stages = listOf(
-        // Stage 1 (Global Stage 28) - Calibration Stage
+        // Stage 1: Incursion Calibration (Off-Center Single Conduit)
         StageDefinition(
             stageId = StageId(4, 1),
             blueprint = StageBlueprint(
                 stageName = "BIO-CONDUIT INITIATION",
-                directive = "Purge the central Bio-Conduit before it secretes toxic slime into adjacent cells.",
+                directive = "Purge the off-center Bio-Conduit before it secretes toxic slime into adjacent cells.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
                     title = "1 BIO-CONDUIT PURGED",
@@ -30,13 +30,13 @@ object Sector04Pack : BaseSectorPack(
                     star2TimeSec = 65
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
+                    CorePlacementSpec(col = 5, row = 2, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 2500,
-                targetScore2Star = 4800,
-                targetScore3Star = 7500,
+                targetScore1Star = 1500,
+                targetScore2Star = 2500,
+                targetScore3Star = 3500,
                 moveBudgetStar2 = 12,
                 timeLimitSecStar2 = 45,
                 masteryFeat = MasteryFeatSpec(
@@ -46,30 +46,118 @@ object Sector04Pack : BaseSectorPack(
                 )
             )
         ),
-        // Stage 2
+        // Stage 2: Line Cleanse Protocol
         StageDefinition(
             stageId = StageId(4, 2),
             blueprint = StageBlueprint(
                 stageName = "CONTAGION CONTAINMENT",
-                directive = "Purge 2 Bio-Conduits on opposing diagonals before bio-hazard leakage.",
+                directive = "Complete 7 full line clears to sterilize infected grid channels.",
+                objective = AdventureStageObjective(
+                    type = ObjectiveType.LINE_CLEANSE,
+                    title = "7 LINES CLEARED",
+                    targetAmount = 7,
+                    star3TimeSec = 40,
+                    star2TimeSec = 75
+                ),
+                initialCores = emptyList()
+            ),
+            benchmarks = StageBenchmarks(
+                targetScore1Star = 2000,
+                targetScore2Star = 4000,
+                targetScore3Star = 6000,
+                moveBudgetStar2 = 14,
+                timeLimitSecStar2 = 50,
+                masteryFeat = MasteryFeatSpec(
+                    featType = MasteryFeatType.MIN_COMBO_STREAK,
+                    targetValue = 2,
+                    description = "Sustain a 2x Surge Streak"
+                )
+            )
+        ),
+        // Stage 3: Asymmetrical Duo
+        StageDefinition(
+            stageId = StageId(4, 3),
+            blueprint = StageBlueprint(
+                stageName = "SLIME DISSOLUTION",
+                directive = "Purge 2 Bio-Conduits in an offset configuration before bio-hazard leakage.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
                     title = "2 BIO-CONDUITS PURGED",
                     targetAmount = 2,
-                    star3TimeSec = 40,
-                    star2TimeSec = 75
+                    star3TimeSec = 45,
+                    star2TimeSec = 80
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 2, row = 2, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 5, row = 5, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
+                    CorePlacementSpec(col = 1, row = 4, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
+                    CorePlacementSpec(col = 4, row = 2, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
+                targetScore1Star = 2500,
+                targetScore2Star = 4800,
+                targetScore3Star = 7500,
+                moveBudgetStar2 = 18,
+                timeLimitSecStar2 = 55,
+                masteryFeat = MasteryFeatSpec(
+                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
+                    targetValue = 2,
+                    description = "Execute a multi-line clear"
+                )
+            )
+        ),
+        // Stage 4: Chroma Synthesis
+        StageDefinition(
+            stageId = StageId(4, 4),
+            blueprint = StageBlueprint(
+                stageName = "BIO-SYNTHESIS ARRAY",
+                directive = "Synthesize 40 energy tiles while neutralizing contagion pockets.",
+                objective = AdventureStageObjective(
+                    type = ObjectiveType.CHROMA_SYNTHESIS,
+                    title = "40 TILES SYNTHESIZED",
+                    targetAmount = 40,
+                    star3TimeSec = 50,
+                    star2TimeSec = 90
+                ),
+                initialCores = emptyList()
+            ),
+            benchmarks = StageBenchmarks(
                 targetScore1Star = 3000,
-                targetScore2Star = 5500,
-                targetScore3Star = 8500,
-                moveBudgetStar2 = 14,
-                timeLimitSecStar2 = 50,
+                targetScore2Star = 5800,
+                targetScore3Star = 8800,
+                moveBudgetStar2 = 20,
+                timeLimitSecStar2 = 65,
+                masteryFeat = MasteryFeatSpec(
+                    featType = MasteryFeatType.SCORE_THRESHOLD,
+                    targetValue = 6500,
+                    description = "Reach 6,500 points during synthesis"
+                )
+            )
+        ),
+        // Stage 5: Perimeter Confinement
+        StageDefinition(
+            stageId = StageId(4, 5),
+            blueprint = StageBlueprint(
+                stageName = "CONDUIT WALL LOCKDOWN",
+                directive = "Purge 3 Bio-Conduits aligned along the southern perimeter.",
+                objective = AdventureStageObjective(
+                    type = ObjectiveType.INFECTED_PURGE,
+                    title = "3 CONDUITS PURGED",
+                    targetAmount = 3,
+                    star3TimeSec = 55,
+                    star2TimeSec = 100
+                ),
+                initialCores = listOf(
+                    CorePlacementSpec(col = 2, row = 5, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
+                    CorePlacementSpec(col = 4, row = 5, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
+                    CorePlacementSpec(col = 6, row = 5, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
+                )
+            ),
+            benchmarks = StageBenchmarks(
+                targetScore1Star = 3200,
+                targetScore2Star = 6500,
+                targetScore3Star = 10000,
+                moveBudgetStar2 = 24,
+                timeLimitSecStar2 = 75,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
                     targetValue = 3,
@@ -77,124 +165,29 @@ object Sector04Pack : BaseSectorPack(
                 )
             )
         ),
-        // Stage 3
+        // Stage 6: Momentum Harmonic
         StageDefinition(
-            stageId = StageId(4, 3),
+            stageId = StageId(4, 6),
             blueprint = StageBlueprint(
-                stageName = "TRI-CONDUIT OUTBREAK",
-                directive = "Neutralize 3 Bio-Conduits forming the outer containment perimeter.",
+                stageName = "VIRAL STREAK HARMONIC",
+                directive = "Sustain a 4x Surge Streak to disintegrate the toxic conduit core.",
                 objective = AdventureStageObjective(
-                    type = ObjectiveType.INFECTED_PURGE,
-                    title = "3 CONDUITS PURGED",
-                    targetAmount = 3,
-                    star3TimeSec = 45,
-                    star2TimeSec = 85
-                ),
-                initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 3, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
-                )
-            ),
-            benchmarks = StageBenchmarks(
-                targetScore1Star = 3500,
-                targetScore2Star = 6500,
-                targetScore3Star = 9500,
-                moveBudgetStar2 = 16,
-                timeLimitSecStar2 = 55,
-                masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.SCORE_THRESHOLD,
-                    targetValue = 6000,
-                    description = "Accumulate ≥ 6,000 points"
-                )
-            )
-        ),
-        // Stage 4
-        StageDefinition(
-            stageId = StageId(4, 4),
-            blueprint = StageBlueprint(
-                stageName = "TOXIC CHROMA SYNTHESIS",
-                directive = "Synthesize 30 Circuit Conduit tiles while containing bio-hazard leaks.",
-                objective = AdventureStageObjective(
-                    type = ObjectiveType.CHROMA_SYNTHESIS,
-                    title = "30 CIRCUIT TILES",
-                    targetAmount = 30,
-                    star3TimeSec = 55,
-                    star2TimeSec = 100
-                ),
-                initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 4, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
-                )
-            ),
-            benchmarks = StageBenchmarks(
-                targetScore1Star = 3800,
-                targetScore2Star = 7000,
-                targetScore3Star = 10500,
-                moveBudgetStar2 = 20,
-                timeLimitSecStar2 = 65,
-                masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
-                    targetValue = 3,
-                    description = "Trigger a 3-line Mega Blitz clear"
-                )
-            )
-        ),
-        // Stage 5
-        StageDefinition(
-            stageId = StageId(4, 5),
-            blueprint = StageBlueprint(
-                stageName = "QUAD CONDUIT SPILLWAY",
-                directive = "Neutralize 4 Bio-Conduits across the perimeter.",
-                objective = AdventureStageObjective(
-                    type = ObjectiveType.INFECTED_PURGE,
-                    title = "4 CONDUITS PURGED",
+                    type = ObjectiveType.SURGE_STREAK_TARGET,
+                    title = "4X SURGE STREAK REACHED",
                     targetAmount = 4,
                     star3TimeSec = 55,
                     star2TimeSec = 105
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
+                    CorePlacementSpec(col = 4, row = 4, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 4)
                 )
             ),
             benchmarks = StageBenchmarks(
-                targetScore1Star = 4000,
-                targetScore2Star = 7500,
-                targetScore3Star = 11000,
-                moveBudgetStar2 = 20,
-                timeLimitSecStar2 = 70,
-                masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.MIN_COMBO_STREAK,
-                    targetValue = 3,
-                    description = "Reach a 3x Surge Streak"
-                )
-            )
-        ),
-        // Stage 6
-        StageDefinition(
-            stageId = StageId(4, 6),
-            blueprint = StageBlueprint(
-                stageName = "BIO-SURGE MOMENTUM",
-                directive = "Achieve a 4x Surge Streak before bio-slimes overcrowd the matrix.",
-                objective = AdventureStageObjective(
-                    type = ObjectiveType.SURGE_STREAK_TARGET,
-                    title = "4x SURGE STREAK",
-                    targetAmount = 4,
-                    star3TimeSec = 45,
-                    star2TimeSec = 85
-                ),
-                initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
-                )
-            ),
-            benchmarks = StageBenchmarks(
-                targetScore1Star = 4200,
-                targetScore2Star = 8000,
-                targetScore3Star = 12000,
-                moveBudgetStar2 = 18,
-                timeLimitSecStar2 = 55,
+                targetScore1Star = 3500,
+                targetScore2Star = 7200,
+                targetScore3Star = 11200,
+                moveBudgetStar2 = 24,
+                timeLimitSecStar2 = 80,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
                     targetValue = 4,
@@ -202,89 +195,89 @@ object Sector04Pack : BaseSectorPack(
                 )
             )
         ),
-        // Stage 7
+        // Stage 7: Subspace Overclock
         StageDefinition(
             stageId = StageId(4, 7),
             blueprint = StageBlueprint(
-                stageName = "TOXIC OVERCLOCK",
-                directive = "Purge 4 corner Bio-Conduits using Warp Injector and line cleanses.",
+                stageName = "QUAD CONDUIT CHOKEPOINT",
+                directive = "Purge 4 Bio-Conduits at asymmetric choke points before toxic flooding.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
                     title = "4 CONDUITS PURGED",
                     targetAmount = 4,
                     star3TimeSec = 60,
-                    star2TimeSec = 115
+                    star2TimeSec = 110
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
+                    CorePlacementSpec(col = 0, row = 3, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
+                    CorePlacementSpec(col = 3, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
+                    CorePlacementSpec(col = 4, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
+                    CorePlacementSpec(col = 7, row = 4, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
+                )
+            ),
+            benchmarks = StageBenchmarks(
+                targetScore1Star = 4000,
+                targetScore2Star = 8200,
+                targetScore3Star = 12500,
+                moveBudgetStar2 = 28,
+                timeLimitSecStar2 = 90,
+                masteryFeat = MasteryFeatSpec(
+                    featType = MasteryFeatType.MULTI_LINE_CLEAR,
+                    targetValue = 2,
+                    description = "Execute a multi-line clear"
+                )
+            )
+        ),
+        // Stage 8: Dual-Wave Escalation
+        StageDefinition(
+            stageId = StageId(4, 8),
+            blueprint = StageBlueprint(
+                stageName = "DUAL WAVE BIO ESCALATION",
+                directive = "Purge 5 Bio-Conduits across 2 defensive waves.",
+                objective = AdventureStageObjective(
+                    type = ObjectiveType.INFECTED_PURGE,
+                    title = "5 CONDUITS PURGED (2 WAVES)",
+                    targetAmount = 5,
+                    star3TimeSec = 70,
+                    star2TimeSec = 120
+                ),
+                initialCores = listOf(
+                    CorePlacementSpec(col = 1, row = 2, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
+                    CorePlacementSpec(col = 6, row = 5, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
                 )
             ),
             benchmarks = StageBenchmarks(
                 targetScore1Star = 4500,
-                targetScore2Star = 8500,
-                targetScore3Star = 13000,
-                moveBudgetStar2 = 24,
-                timeLimitSecStar2 = 80,
-                masteryFeat = MasteryFeatSpec(
-                    featType = MasteryFeatType.SCORE_THRESHOLD,
-                    targetValue = 8000,
-                    description = "Accumulate ≥ 8,000 points"
-                )
-            )
-        ),
-        // Stage 8
-        StageDefinition(
-            stageId = StageId(4, 8),
-            blueprint = StageBlueprint(
-                stageName = "DUAL WAVE CONTAGION",
-                directive = "Purge 4 Bio-Conduits across 2 defensive waves.",
-                objective = AdventureStageObjective(
-                    type = ObjectiveType.INFECTED_PURGE,
-                    title = "4 CONDUITS (2 WAVES)",
-                    targetAmount = 4,
-                    star3TimeSec = 70,
-                    star2TimeSec = 130
-                ),
-                initialCores = listOf(
-                    CorePlacementSpec(col = 2, row = 3, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 5, row = 4, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
-                )
-            ),
-            benchmarks = StageBenchmarks(
-                targetScore1Star = 4800,
                 targetScore2Star = 9000,
-                targetScore3Star = 14000,
-                moveBudgetStar2 = 26,
-                timeLimitSecStar2 = 90,
+                targetScore3Star = 13800,
+                moveBudgetStar2 = 30,
+                timeLimitSecStar2 = 100,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.MIN_COMBO_STREAK,
                     targetValue = 3,
-                    description = "Chain a 3x Streak through Wave 2"
+                    description = "Sustain a 3x Surge Streak"
                 )
             )
         ),
-        // Stage 9 (Boss)
+        // Stage 9: Sector Apex Boss
         StageDefinition(
             stageId = StageId(4, 9),
             blueprint = StageBlueprint(
-                stageName = "BIO-COLOSSUS // APEX",
-                directive = "Phase 1: Destroy 4 Bio-Relay Pylons.\nPhase 2: Strike the central Bio-Core before toxic sludge covers the grid.",
+                stageName = "BIO-TITAN OVERLORD // APEX",
+                directive = "Phase 1: Destroy 4 Contagion Pylons.\nPhase 2: Strike the central Bio-Titan Core 4x to purge contagion.",
                 objective = AdventureStageObjective(
                     type = ObjectiveType.INFECTED_PURGE,
-                    title = "BIO-COLOSSUS DESTROYED",
+                    title = "BIO-TITAN DEFEATED",
                     targetAmount = 5,
-                    star3TimeSec = 95,
-                    star2TimeSec = 170
+                    star3TimeSec = 90,
+                    star2TimeSec = 140
                 ),
                 initialCores = listOf(
-                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 3, isLocked = true),
-                    CorePlacementSpec(col = 1, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2),
-                    CorePlacementSpec(col = 6, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 2)
+                    CorePlacementSpec(col = 3, row = 3, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 4, isLocked = true),
+                    CorePlacementSpec(col = 1, row = 2, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 1),
+                    CorePlacementSpec(col = 6, row = 1, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 1),
+                    CorePlacementSpec(col = 1, row = 6, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 1),
+                    CorePlacementSpec(col = 6, row = 5, coreType = SectorCoreType.BIO_CONDUIT_SEC4, maxHits = 1)
                 )
             ),
             benchmarks = StageBenchmarks(
@@ -292,11 +285,11 @@ object Sector04Pack : BaseSectorPack(
                 targetScore2Star = 10000,
                 targetScore3Star = 15000,
                 moveBudgetStar2 = 32,
-                timeLimitSecStar2 = 120,
+                timeLimitSecStar2 = 110,
                 masteryFeat = MasteryFeatSpec(
                     featType = MasteryFeatType.NO_EMP_JAMMED,
                     targetValue = 1,
-                    description = "Defeat Bio-Colossus with 0 slots jammed"
+                    description = "Defeat Bio-Titan with 0 slots jammed"
                 )
             )
         )

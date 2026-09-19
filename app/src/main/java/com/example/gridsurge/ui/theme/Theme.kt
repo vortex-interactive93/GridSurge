@@ -57,7 +57,7 @@ fun GridSurgeTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = CyberMaterialTypography,
         content = content
     )
 }

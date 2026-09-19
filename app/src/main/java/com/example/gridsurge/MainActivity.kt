@@ -1,7 +1,6 @@
 package com.example.gridsurge
 
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +14,8 @@ import com.example.gridsurge.billing.BillingManager
 import com.example.gridsurge.game.util.DisplayMetricsPreloader
 import com.example.gridsurge.meta.PlayerProfileManager
 import com.example.gridsurge.meta.SkinThemeManager
+import com.example.gridsurge.network.SupabaseClientProvider
+import io.github.jan.supabase.gotrue.handleDeeplinks
 import com.example.gridsurge.settings.SettingsManager
 import com.example.gridsurge.ui.NavigationRoot
 import com.example.gridsurge.ui.theme.GridSurgeTheme
@@ -22,9 +23,10 @@ import com.example.gridsurge.ui.util.ImmersiveModeHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         installSplashScreen()
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        handleIncomingAuth(intent)
         ImmersiveModeHelper.enableImmersiveStickyMode(this)
         SkinThemeManager.init(this)
         SfxManager.initialize(this)
@@ -41,7 +43,6 @@ class MainActivity : ComponentActivity() {
             VoicePackId.valueOf(savedPackName) 
         }.getOrDefault(VoicePackId.CYBER_AI)
 
-        enableEdgeToEdge()
         setContent {
             GridSurgeTheme {
                 NavigationRoot()
@@ -62,6 +63,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleIncomingAuth(intent)
+    }
+
+    private fun handleIncomingAuth(intent: Intent?) {
+        intent?.data?.let { uri ->
+            if (SupabaseClientProvider.isConfigured) {
+                try {
+                    SupabaseClientProvider.client.handleDeeplinks(intent)
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

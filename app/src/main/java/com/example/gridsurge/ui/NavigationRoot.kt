@@ -29,12 +29,13 @@ import com.example.gridsurge.ui.career.CareerProgressScreen
 import com.example.gridsurge.ui.dialogs.CyberProfileSetupDialog
 import com.example.gridsurge.ui.quests.DailyMissionsScreen
 import com.example.gridsurge.ui.quests.DailyMissionsViewModel
+import com.example.gridsurge.ui.screens.OperativeHonorsScreen
 import com.example.gridsurge.ui.screens.TierAchievementsScreen
 import com.example.gridsurge.ui.screens.StudioSplashScreen
 import com.example.gridsurge.ui.store.CyberStoreScreen
 import kotlinx.coroutines.launch
 
-enum class Screen { STUDIO_SPLASH, MAIN_MENU, GAME_CLASSIC, GAME_ADVENTURE, ARMORY, CAREER, DAILY_GLITCH, TIME_BLITZ, BLITZ_CLASH, LEADERBOARD, QUESTS, SETTINGS, ADVENTURE_MAP, STORE, ACHIEVEMENTS, AUTH }
+enum class Screen { STUDIO_SPLASH, MAIN_MENU, GAME_CLASSIC, GAME_ADVENTURE, ARMORY, CAREER, DAILY_GLITCH, TIME_BLITZ, BLITZ_CLASH, LEADERBOARD, QUESTS, SETTINGS, ADVENTURE_MAP, STORE, ACHIEVEMENTS, AUTH, OPERATIVE_HONORS }
 
 @Composable
 fun NavigationRoot() {
@@ -72,6 +73,7 @@ fun NavigationRoot() {
                 profileManager = profileManager,
                 armoryRepository = armoryRepository,
                 dailyLoginRepository = dailyLoginRepository,
+                dailyMissionsRepository = dailyMissionsRepository,
                 onNavigate = { nextScreen ->
                     if (nextScreen == Screen.GAME_ADVENTURE) {
                         currentScreen = Screen.ADVENTURE_MAP
@@ -171,17 +173,9 @@ fun NavigationRoot() {
                 )
             }
             Screen.ARMORY -> {
-                val armoryViewModel: ArmoryViewModel = viewModel(
-                    factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-                        @Suppress("UNCHECKED_CAST")
-                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                            return ArmoryViewModel(profileManager) as T
-                        }
-                    }
-                )
                 CyberArmoryScreen(
-                    viewModel = armoryViewModel,
-                    onNavigateBack = { currentScreen = Screen.MAIN_MENU }
+                    profileManager = profileManager,
+                    onNavigate = { currentScreen = it }
                 )
             }
             Screen.STORE -> CyberStoreScreen(
@@ -248,32 +242,22 @@ fun NavigationRoot() {
                 )
             }
             Screen.BLITZ_CLASH -> {
-                val hasConfiguredProfile by profileManager.hasConfiguredProfile.collectAsState()
-                var showProfileSetupModal by remember { mutableStateOf(!hasConfiguredProfile) }
-
-                Box(modifier = Modifier.fillMaxSize()) {
-                    GameScreen(
-                        profileManager = profileManager,
-                        armoryRepository = armoryRepository,
-                        dailyMissionsRepository = dailyMissionsRepository,
-                        adventureViewModel = viewModel(),
-                        gameMode = Screen.BLITZ_CLASH,
-                        onNavigateBack = { _ -> currentScreen = Screen.MAIN_MENU }
-                    )
-
-                    if (showProfileSetupModal) {
-                        CyberProfileSetupDialog(
-                            profileManager = profileManager,
-                            isPvpRequiredNotice = true,
-                            onProfileInitialized = {
-                                showProfileSetupModal = false
-                            },
-                            onDismiss = {
-                                currentScreen = Screen.MAIN_MENU
-                            }
-                        )
+                val advVm: AdventureViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return AdventureViewModel(adventureRepository, profileManager) as T
+                        }
                     }
-                }
+                )
+                GameScreen(
+                    profileManager = profileManager,
+                    armoryRepository = armoryRepository,
+                    dailyMissionsRepository = dailyMissionsRepository,
+                    adventureViewModel = advVm,
+                    gameMode = Screen.BLITZ_CLASH,
+                    onNavigateBack = { _ -> currentScreen = Screen.MAIN_MENU }
+                )
             }
             Screen.ACHIEVEMENTS -> {
                 TierAchievementsScreen(
@@ -285,6 +269,12 @@ fun NavigationRoot() {
                 CyberAuthScreen(
                     profileManager = profileManager,
                     onNavigateBack = { currentScreen = Screen.MAIN_MENU }
+                )
+            }
+            Screen.OPERATIVE_HONORS -> {
+                OperativeHonorsScreen(
+                    profileManager = profileManager,
+                    onNavigate = { currentScreen = it }
                 )
             }
             Screen.LEADERBOARD -> {

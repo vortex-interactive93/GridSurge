@@ -120,7 +120,7 @@ class DeterministicMoveValidator(
             totalLines += moveClearedLines
 
             val moveBaseScore = when (envelope.mode) {
-                GameModeType.TIME_BLITZ.storageKey -> {
+                GameModeType.TIME_BLITZ.storageKey, GameModeType.BLITZ_CLASH.storageKey -> {
                     val base = if (moveClearedLines > 0) (moveClearedLines * 150L) * moveClearedLines + (comboResult.currentStreak * 75L) else 10L
                     base
                 }

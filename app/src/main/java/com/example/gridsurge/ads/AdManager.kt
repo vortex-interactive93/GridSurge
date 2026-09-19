@@ -3,6 +3,7 @@ package com.example.gridsurge.ads
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
@@ -83,13 +84,14 @@ object AdManager {
     }
 
     /**
-     * Shows a Rewarded Video Ad (e.g. for Pity Revive or 2x Stars).
+     * Shows a Rewarded Video Ad (e.g. for Pity Revive or Extra Daily Attempt).
      * If user purchased No-Ads, immediately triggers onRewardEarned without video!
      */
     fun showRewardedAd(
         activity: Activity,
         isNoAdsPurchased: Boolean,
-        onRewardEarned: () -> Unit
+        onRewardEarned: () -> Unit,
+        onAdNotReady: (() -> Unit)? = null
     ) {
         if (isNoAdsPurchased) {
             Log.d(TAG, "No-Ads License Active: Instant 1-tap claim!")
@@ -106,10 +108,13 @@ object AdManager {
             loadedRewardedAd = null
             preloadRewardedAd(activity)
         } else {
-            // Fallback: If ad failed to load, grant reward so player isn't penalized!
-            Log.w(TAG, "Ad not ready; granting reward fallback.")
-            onRewardEarned()
+            Log.w(TAG, "Ad not ready; preloading...")
             preloadRewardedAd(activity)
+            if (onAdNotReady != null) {
+                onAdNotReady()
+            } else {
+                Toast.makeText(activity, "Ad loading... Please tap again in a moment.", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
